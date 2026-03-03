@@ -1,0 +1,37 @@
+﻿{
+  "summary": {
+    "totalMilk": 612,
+    "totalFarmers": 162,
+    "session": {
+      "morning": 372,
+      "evening": 240
+    },
+    "type": {
+      "buffalo": 248,
+      "cow": 364
+    }
+  },
+  "milkBreakdown": [
+    { "name": "Buffalo Milk", "value": 248 },
+    { "name": "Cow Milk", "value": 364 }
+  ],
+  "feedMineral": [
+    { "name": "Cattle Feed", "qty": "280 Kg", "lastReceived": "05-01-2026" },
+    { "name": "Mineral Mix", "qty": "315 Kg", "lastReceived": "07-01-2026" }
+  ],
+  "revenue": [
+    { "month": "January", "buffalo": 42, "cow": 54 },
+    { "month": "February", "buffalo": 46, "cow": 57 },
+    { "month": "March", "buffalo": 49, "cow": 60 },
+    { "month": "April", "buffalo": 52, "cow": 62 },
+    { "month": "May", "buffalo": 55, "cow": 66 },
+    { "month": "June", "buffalo": 58, "cow": 69 },
+    { "month": "July", "buffalo": 62, "cow": 72 },
+    { "month": "August", "buffalo": 60, "cow": 73 },
+    { "month": "September", "buffalo": 66, "cow": 76 },
+    { "month": "October", "buffalo": 70, "cow": 79 },
+    { "month": "November", "buffalo": 68, "cow": 82 },
+    { "month": "December", "buffalo": 74, "cow": 86 }
+  ],
+  "updatedOn": "07-01-2026"
+}

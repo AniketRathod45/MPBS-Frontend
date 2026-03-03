@@ -6,7 +6,7 @@ import ForgotPassword from "../modules/society/ForgotPassword";
 import Dashboard from "../modules/society/Dashboard";
 import MilkCollection from "../modules/society/MilkCollection";
 import RateSheet from "../modules/society/RateSheet";
-import DispatchSheet from "../modules/society/DispatchSheet";
+import SocietyVerification from "../modules/society/Verification";
 import Layout from "./layout/Layout";
 import AuthGuard from "../shared/components/AuthGaurd";
 
@@ -19,8 +19,11 @@ import AdminLayout from "./layout/AdminLayout";
 import AdminAuthGuard from "../shared/components/AdminAuthGaurd";
 
 // ================= BMC =================
-import BMCLogin from "../modules/bmc/Login";
 import MilkVerification from "../modules/bmc/SocietyMilkVerification";
+import BmcDashboard from "../modules/bmc/Dashboard";
+import TruckSheet from "../modules/bmc/TruckSheet";
+import Reports from "../modules/bmc/Reports";
+import BMCLogin from "../modules/bmc/Login";
 import BMCLayout from "./layout/BmcLayout";
 import BMCAuthGuard from "../shared/components/BmcAuthGaurd";
 
@@ -30,7 +33,15 @@ export default function AppRouter() {
       <Routes>
         {/* ================= SOCIETY ROUTES ================= */}
         <Route path="/login" element={<SocietyLogin />} />
+        <Route path="/login/society" element={<SocietyLogin />} />
+        <Route path="/login/soceity" element={<SocietyLogin />} />
+        <Route path="/login/bmc" element={<BMCLogin />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/society/verification" element={<SocietyVerification />} />
+        <Route
+          path="/socity/verification"
+          element={<Navigate to="/society/verification" replace />}
+        />
 
         <Route
           path="/"
@@ -43,7 +54,6 @@ export default function AppRouter() {
           <Route index element={<Dashboard />} />
           <Route path="collection" element={<MilkCollection />} />
           <Route path="ratesheet" element={<RateSheet />} />
-          <Route path="dispatch" element={<DispatchSheet />} />
         </Route>
 
         {/* ================= ADMIN ROUTES ================= */}
@@ -74,7 +84,11 @@ export default function AppRouter() {
             </BMCAuthGuard>
           }
         >
+          <Route index element={<Navigate to="/bmc/dashboard" replace />} />
+          <Route path="dashboard" element={<BmcDashboard />} />
           <Route path="verification" element={<MilkVerification />} />
+          <Route path="truck-sheet" element={<TruckSheet />} />
+          <Route path="reports" element={<Reports />} />
         </Route>
 
         {/* ================= FALLBACK ================= */}

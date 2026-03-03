@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resetPassword } from "../../api/auth";
 
@@ -44,7 +44,7 @@ export default function ForgotPassword() {
       return;
     }
 
-    // MOCK API – backend will handle approval later
+    // MOCK API â€“ backend will handle approval later
     const res = await resetPassword({
       societyCode,
       newPassword,
@@ -115,3 +115,7 @@ export default function ForgotPassword() {
     </div>
   );
 }
+
+
+
+

@@ -1,0 +1,204 @@
+{
+  "societiesVerified": { "verified": 7, "total": 10 },
+  "dispatchStatus": "Dispatched",
+  "milkProcuredByMonth": {
+    "Jan": [
+      { "name": "DCS 1", "value": 110 },
+      { "name": "DCS 2", "value": 230 },
+      { "name": "DCS 3", "value": 85 },
+      { "name": "DCS 4", "value": 70 },
+      { "name": "DCS 5", "value": 92 }
+    ],
+    "Feb": [
+      { "name": "DCS 1", "value": 120 },
+      { "name": "DCS 2", "value": 245 },
+      { "name": "DCS 3", "value": 90 },
+      { "name": "DCS 4", "value": 78 },
+      { "name": "DCS 5", "value": 98 }
+    ],
+    "Mar": [
+      { "name": "DCS 1", "value": 135 },
+      { "name": "DCS 2", "value": 260 },
+      { "name": "DCS 3", "value": 95 },
+      { "name": "DCS 4", "value": 82 },
+      { "name": "DCS 5", "value": 104 }
+    ],
+    "Apr": [
+      { "name": "DCS 1", "value": 128 },
+      { "name": "DCS 2", "value": 250 },
+      { "name": "DCS 3", "value": 92 },
+      { "name": "DCS 4", "value": 79 },
+      { "name": "DCS 5", "value": 100 }
+    ],
+    "May": [
+      { "name": "DCS 1", "value": 118 },
+      { "name": "DCS 2", "value": 240 },
+      { "name": "DCS 3", "value": 88 },
+      { "name": "DCS 4", "value": 74 },
+      { "name": "DCS 5", "value": 96 }
+    ],
+    "Jun": [
+      { "name": "DCS 1", "value": 140 },
+      { "name": "DCS 2", "value": 270 },
+      { "name": "DCS 3", "value": 98 },
+      { "name": "DCS 4", "value": 86 },
+      { "name": "DCS 5", "value": 108 }
+    ],
+    "Jul": [
+      { "name": "DCS 1", "value": 132 },
+      { "name": "DCS 2", "value": 255 },
+      { "name": "DCS 3", "value": 93 },
+      { "name": "DCS 4", "value": 80 },
+      { "name": "DCS 5", "value": 102 }
+    ],
+    "Aug": [
+      { "name": "DCS 1", "value": 125 },
+      { "name": "DCS 2", "value": 248 },
+      { "name": "DCS 3", "value": 90 },
+      { "name": "DCS 4", "value": 78 },
+      { "name": "DCS 5", "value": 99 }
+    ],
+    "Sep": [
+      { "name": "DCS 1", "value": 138 },
+      { "name": "DCS 2", "value": 265 },
+      { "name": "DCS 3", "value": 97 },
+      { "name": "DCS 4", "value": 84 },
+      { "name": "DCS 5", "value": 106 }
+    ],
+    "Oct": [
+      { "name": "DCS 1", "value": 120 },
+      { "name": "DCS 2", "value": 245 },
+      { "name": "DCS 3", "value": 91 },
+      { "name": "DCS 4", "value": 76 },
+      { "name": "DCS 5", "value": 98 }
+    ],
+    "Nov": [
+      { "name": "DCS 1", "value": 130 },
+      { "name": "DCS 2", "value": 252 },
+      { "name": "DCS 3", "value": 94 },
+      { "name": "DCS 4", "value": 79 },
+      { "name": "DCS 5", "value": 103 }
+    ],
+    "Dec": [
+      { "name": "DCS 1", "value": 126 },
+      { "name": "DCS 2", "value": 258 },
+      { "name": "DCS 3", "value": 92 },
+      { "name": "DCS 4", "value": 81 },
+      { "name": "DCS 5", "value": 101 }
+    ]
+  },
+  "milkRejectedByMonth": {
+    "Jan": [
+      { "name": "DCS 1", "value": 2 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 4 },
+      { "name": "DCS 4", "value": 1 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Feb": [
+      { "name": "DCS 1", "value": 1 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 3 },
+      { "name": "DCS 4", "value": 2 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Mar": [
+      { "name": "DCS 1", "value": 0 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 6 },
+      { "name": "DCS 4", "value": 1 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Apr": [
+      { "name": "DCS 1", "value": 1 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 4 },
+      { "name": "DCS 4", "value": 0 },
+      { "name": "DCS 5", "value": 1 }
+    ],
+    "May": [
+      { "name": "DCS 1", "value": 0 },
+      { "name": "DCS 2", "value": 1 },
+      { "name": "DCS 3", "value": 3 },
+      { "name": "DCS 4", "value": 0 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Jun": [
+      { "name": "DCS 1", "value": 2 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 5 },
+      { "name": "DCS 4", "value": 1 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Jul": [
+      { "name": "DCS 1", "value": 1 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 4 },
+      { "name": "DCS 4", "value": 1 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Aug": [
+      { "name": "DCS 1", "value": 0 },
+      { "name": "DCS 2", "value": 1 },
+      { "name": "DCS 3", "value": 4 },
+      { "name": "DCS 4", "value": 0 },
+      { "name": "DCS 5", "value": 1 }
+    ],
+    "Sep": [
+      { "name": "DCS 1", "value": 2 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 5 },
+      { "name": "DCS 4", "value": 1 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Oct": [
+      { "name": "DCS 1", "value": 1 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 3 },
+      { "name": "DCS 4", "value": 0 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Nov": [
+      { "name": "DCS 1", "value": 2 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 4 },
+      { "name": "DCS 4", "value": 1 },
+      { "name": "DCS 5", "value": 0 }
+    ],
+    "Dec": [
+      { "name": "DCS 1", "value": 1 },
+      { "name": "DCS 2", "value": 0 },
+      { "name": "DCS 3", "value": 3 },
+      { "name": "DCS 4", "value": 0 },
+      { "name": "DCS 5", "value": 0 }
+    ]
+  },
+  "monthQuality": [
+    { "name": "Jan", "good": 110, "bad": 22 },
+    { "name": "Feb", "good": 120, "bad": 24 },
+    { "name": "Mar", "good": 140, "bad": 30 },
+    { "name": "Apr", "good": 120, "bad": 25 },
+    { "name": "May", "good": 110, "bad": 20 },
+    { "name": "Jun", "good": 180, "bad": 35 },
+    { "name": "Jul", "good": 90, "bad": 18 },
+    { "name": "Aug", "good": 80, "bad": 16 },
+    { "name": "Sep", "good": 85, "bad": 18 },
+    { "name": "Oct", "good": 70, "bad": 14 },
+    { "name": "Nov", "good": 95, "bad": 19 },
+    { "name": "Dec", "good": 130, "bad": 26 }
+  ],
+  "overheads": [
+    { "name": "Jan", "diesel": 180, "secretary": 320, "repair": 340 },
+    { "name": "Feb", "diesel": 200, "secretary": 300, "repair": 360 },
+    { "name": "Mar", "diesel": 210, "secretary": 320, "repair": 360 },
+    { "name": "Apr", "diesel": 240, "secretary": 270, "repair": 380 },
+    { "name": "May", "diesel": 210, "secretary": 300, "repair": 350 },
+    { "name": "Jun", "diesel": 260, "secretary": 270, "repair": 400 },
+    { "name": "Jul", "diesel": 300, "secretary": 240, "repair": 440 },
+    { "name": "Aug", "diesel": 350, "secretary": 210, "repair": 480 },
+    { "name": "Sep", "diesel": 410, "secretary": 180, "repair": 460 },
+    { "name": "Oct", "diesel": 350, "secretary": 200, "repair": 520 },
+    { "name": "Nov", "diesel": 320, "secretary": 220, "repair": 500 },
+    { "name": "Dec", "diesel": 340, "secretary": 240, "repair": 540 }
+  ]
+}

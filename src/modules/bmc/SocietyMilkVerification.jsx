@@ -1,199 +1,303 @@
-import { useEffect, useState } from "react";
-import { getSession } from "../../utils/session";
-import { fetchRateAndAmount } from "../../api/rateSheet";
-import { mockBMCSocieties, markSocietyAsVerified } from "../../mock/bmcMock";
-import SocietySelector from "./components/SocietySelector";
-import VerificationTable from "./components/SocietyEntry";
+import { useCallback, useEffect, useState } from "react";
+import "./SocietyMilkVerification.css";
+import EntryTable from "./components/EntryTable";
+import NotificationBell from "./components/NotificationBell";
+import BMCPanel from "./components/BMCPanel";
+import SaveModal from "./components/SaveModal";
+import {
+  SOCIETIES_DATA,
+  INITIAL_NOTIFICATIONS,
+  BMC_USER,
+  calcSession,
+  genReport,
+  isRowValid,
+  emptyRow,
+} from "./utils/engine";
+
+function useClock() {
+  const [time, setTime] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const n = new Date();
+      let h = n.getHours();
+      const m = n.getMinutes();
+      const s = n.getSeconds();
+      const ap = h >= 12 ? "PM" : "AM";
+      h = h % 12 || 12;
+      const p = (v) => String(v).padStart(2, "0");
+      setTime(`${p(h)}:${p(m)}:${p(s)} ${ap}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return time;
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, "0")} / ${String(d.getMonth() + 1).padStart(2, "0")} / ${d.getFullYear()}`;
+}
 
 export default function MilkVerification() {
-  const [session, setSession] = useState(null);
-  const [societies, setSocieties] = useState([]);
-  const [selectedSociety, setSelectedSociety] = useState(null);
-  const [matchStatus, setMatchStatus] = useState(null);
-  const [correctionEntries, setCorrectionEntries] = useState([]);
-  const [saved, setSaved] = useState(false);
+  const clock = useClock();
+  const dateStr = todayStr();
+  const bmcUserName = localStorage.getItem("bmc_name") || BMC_USER.name;
 
-useEffect(() => {
-    setSession(getSession());
-    setSocieties(mockBMCSocieties);
-  }, []);
+  const [societies, setSocieties] = useState(() => SOCIETIES_DATA.map((s) => ({ ...s })));
+  const [selectedSoc, setSelectedSoc] = useState(null);
 
-  if (!session) return null;
+  const [rows, setRows] = useState([emptyRow(), emptyRow()]);
+  const [bmcRows, setBmcRows] = useState([emptyRow(), emptyRow()]);
 
-  const handleSocietySelect = (society) => {
-    if (!society) return;
-    setSelectedSociety(society);
-    
-    if (society.verified) {
-      setSaved(true);
-      setMatchStatus(society.matchStatus ?? true);
-      // Show the entries that were saved (original or corrected)
-      setCorrectionEntries(society.entries.map(e => ({ ...e })));
-    } else {
-      setSaved(false);
-      setMatchStatus(null);
-      // Pre-fill correction entries with society data
-      setCorrectionEntries(society.entries.map((e) => ({ ...e })));
+  const [verifyChoice, setVerifyChoice] = useState(null);
+
+  const [saveModal, setSaveModal] = useState(null);
+  const [saveError, setSaveError] = useState("");
+
+  const [notifs, setNotifs] = useState(INITIAL_NOTIFICATIONS);
+
+  const handleSocietyChange = (e) => {
+    const name = e.target.value;
+    if (!name) {
+      setSelectedSoc(null);
+      return;
     }
+    const soc = societies.find((s) => s.name === name);
+    setSelectedSoc({ ...soc });
+    setRows([emptyRow(), emptyRow()]);
+    setBmcRows([emptyRow(), emptyRow()]);
+    setVerifyChoice(null);
+    setSaveError("");
   };
 
-  const handleCorrectionChange = async (index, field, value) => {
-    const updated = [...correctionEntries];
-    updated[index][field] = value;
-    setCorrectionEntries(updated);
+  const handleRowChange = useCallback((idx, field, val) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: val };
+      return next;
+    });
+  }, []);
 
-    if (["milkType", "fat", "snf", "qty"].includes(field)) {
-      const entry = updated[index];
-      if (entry.milkType && entry.qty) {
-        const { rate, amount } = await fetchRateAndAmount({
-          milkType: entry.milkType,
-          fat: Number(entry.fat),
-          snf: Number(entry.snf),
-          qty: Number(entry.qty)
-        });
-        updated[index].rate = rate;
-        updated[index].amount = amount;
-        setCorrectionEntries([...updated]);
-      }
-    }
+  const handleRowDelete = useCallback((idx) => {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  const handleAddRow = useCallback(() => {
+    setRows((prev) => [...prev, emptyRow()]);
+  }, []);
+
+  const handleBmcChange = useCallback((idx, field, val) => {
+    setBmcRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: val };
+      return next;
+    });
+  }, []);
+
+  const handleVerify = (choice) => {
+    setVerifyChoice(choice);
+    if (choice === "yes") setBmcRows([emptyRow(), emptyRow()]);
   };
 
   const handleSave = () => {
-    if (!window.confirm("Cross-check values before saving?")) return;
+    const validRows = rows.filter(isRowValid).map((r) => ({
+      type: r.type,
+      fat: parseFloat(r.fat),
+      snf: parseFloat(r.snf),
+      qty: parseFloat(r.qty),
+    }));
 
-    // 1. Create updated society object
-    const updatedSociety = {
-      ...selectedSociety,
-      verified: true,
-      matchStatus: matchStatus,
-      // If "No", use corrected entries. If "Yes", keep original.
-      entries: matchStatus === false ? correctionEntries : selectedSociety.entries
+    if (!validRows.length) {
+      setSaveError("Please fill in at least one complete row before saving.");
+      setTimeout(() => setSaveError(""), 4000);
+      return;
+    }
+    if (!verifyChoice) {
+      setSaveError("Please select YES or NO for verification before saving.");
+      setTimeout(() => setSaveError(""), 4000);
+      return;
+    }
+
+    const session = calcSession(validRows);
+
+    let bmcEntries = null;
+    if (verifyChoice === "no") {
+      const validBmc = bmcRows.filter(isRowValid).map((r) => ({
+        type: r.type,
+        fat: parseFloat(r.fat),
+        snf: parseFloat(r.snf),
+        qty: parseFloat(r.qty),
+      }));
+      if (validBmc.length) bmcEntries = validBmc;
+    }
+
+    let comparisonStatus = verifyChoice === "yes" ? "VERIFIED" : "-";
+    if (verifyChoice === "no" && bmcEntries) {
+      const rep = genReport(selectedSoc.name, validRows, bmcEntries);
+      comparisonStatus = rep.status;
+    }
+
+    const record = {
+      society: selectedSoc.name,
+      savedAt: new Date().toLocaleString("en-IN"),
+      savedBy: bmcUserName,
+      verifyChoice: verifyChoice === "yes" ? "YES - Values Match" : "NO - BMC Values Entered",
+      entries: session.entries,
+      totalQty: session.totalQty,
+      totalAmt: session.totalAmtFmt,
+      bmcEntries,
+      comparisonStatus,
     };
 
-    // 2. Update list and active selection
-    const updatedList = societies.map(s => s.id === selectedSociety.id ? updatedSociety : s);
-    setSocieties(updatedList);
-    setSelectedSociety(updatedSociety);
-    markSocietyAsVerified(selectedSociety.id);
-    setSaved(true);
-    alert("Verification saved & locked");
+    try {
+      const all = JSON.parse(localStorage.getItem("milkVerifications") || "{}");
+      all[selectedSoc.name] = record;
+      localStorage.setItem("milkVerifications", JSON.stringify(all));
+    } catch (_) {
+      // ignore storage errors
+    }
+
+    setSocieties((prev) =>
+      prev.map((s) => (s.name === selectedSoc.name ? { ...s, status: "verified" } : s)),
+    );
+    setSelectedSoc((prev) => ({ ...prev, status: "verified" }));
+    setSaveModal(record);
   };
 
-  return (
-    <div className="p-6">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-semibold">Society Milk Verification</h1>
-        <span className="px-3 py-1 bg-cyan-700 text-white rounded text-sm">
-          Session: {session === "M" ? "Morning (M)" : "Evening (E)"}
-        </span>
-      </div>
+  const markRead = (id) => setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  const markAllRead = () => setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+  const dismissNotif = (id) => setNotifs((prev) => prev.filter((n) => n.id !== id));
+  const clearAll = () => setNotifs([]);
 
-      <div className="flex gap-6">
-        {/* LEFT: SOCIETY DROPDOWN */}
-        <div className="w-64">
-           <SocietySelector
-            societies={societies}
-            selected={selectedSociety}
-            onSelect={handleSocietySelect}
+  const statusClass = selectedSoc?.status === "verified" ? "verified" : "not-verified";
+  const statusText = selectedSoc?.status === "verified" ? "Verified" : "Not Verified";
+
+  return (
+    <div className="bmc-verify">
+      <header className="topbar">
+        <div className="topbar-left">
+          <span className="page-title">Society Milk Verification</span>
+          <span className="date-badge">{dateStr}</span>
+        </div>
+        <div className="topbar-right">
+          <div className="live-time">
+            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
+            </svg>
+            {clock}
+          </div>
+          <NotificationBell
+            notifs={notifs}
+            onMarkRead={markRead}
+            onMarkAll={markAllRead}
+            onDismiss={dismissNotif}
+            onClearAll={clearAll}
           />
         </div>
+      </header>
 
-        {/* RIGHT: VERIFICATION PANEL */}
-        {selectedSociety && (
-          <div className="flex-1">
-            {/* Society Info Header */}
-            <div className="bg-white p-4 rounded shadow mb-4 border-l-4 border-cyan-700">
-              <h2 className="font-semibold text-lg">{selectedSociety.name}</h2>
-              <div className="text-sm text-gray-600 mt-1">
-                Session: {selectedSociety.session === "M" ? "Morning" : "Evening"} • 
-                Time: {selectedSociety.time} • 
-                Date: {new Date(selectedSociety.date).toLocaleDateString()}
+      <div className="content">
+        <div className="controls-bar">
+          <label htmlFor="society-select">Society</label>
+          <div className="society-dropdown-wrap">
+            <select
+              id="society-select"
+              className="society-dropdown"
+              value={selectedSoc?.name || ""}
+              onChange={handleSocietyChange}
+            >
+              <option value="">- Select Society -</option>
+              {societies.map((s) => (
+                <option key={s.name} value={s.name}>
+                  {s.name} - {s.qty} L
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedSoc && (
+            <div className="society-meta">
+              <div className="society-qty-badge">
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                {selectedSoc.qty} L
+              </div>
+              <span className={`status-pill ${statusClass}`}>
+                <span className="status-dot" />
+                {statusText}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {selectedSoc ? (
+          <div className="section-card">
+            <div className="card-header">
+              <div className="card-title">
+                <span className="card-title-dot" />
+                Society Entry - {selectedSoc.name}
               </div>
             </div>
 
-            {/* SECTION A: Society Entry (Read-only) */}
-            <div className="mb-6">
-              <h3 className="font-semibold mb-2 text-gray-700">
-                Section A: Society Entry (Read-only)
-              </h3>
-              <VerificationTable
-                entries={selectedSociety.entries}
-                enabled={false}
-              />
-            </div>
+            <EntryTable rows={rows} onChange={handleRowChange} onDelete={handleRowDelete} onAddRow={handleAddRow} />
 
-            {!saved && (
-              <>
-                {/* SECTION B: Physical Verification */}
-                <div className="bg-white p-4 rounded shadow mb-4">
-                  <p className="font-semibold mb-3">
-                    Section B: Do physical values match society entry?
-                  </p>
-
-                  <div className="space-x-4">
-                    <label className="inline-flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="match"
-                        checked={matchStatus === true}
-                        onChange={() => setMatchStatus(true)}
-                        className="mr-2"
-                      />
-                      <span>Yes</span>
-                    </label>
-
-                    <label className="inline-flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="match"
-                        checked={matchStatus === false}
-                        onChange={() => setMatchStatus(false)}
-                        className="mr-2"
-                      />
-                      <span>No</span>
-                    </label>
-                  </div>
+            <div className="verify-section">
+              <div className="verify-label">Do physical values match society entry?</div>
+              <div className="verify-options">
+                <div
+                  className={`verify-option${verifyChoice === "yes" ? " sel-yes" : ""}`}
+                  onClick={() => handleVerify("yes")}
+                >
+                  <div className="radio-circle">{verifyChoice === "yes" && <div className="radio-filled" />}</div>
+                  YES - Values Match
                 </div>
-
-                {/* SECTION C: Correction Entry (Conditional) */}
-                {matchStatus === false && (
-                  <div className="mb-4">
-                    {/* <h3 className="font-semibold mb-2 text-gray-700">
-                      Section C: Correction Entry
-                    </h3> */}
-                    <VerificationTable
-                      entries={correctionEntries}
-                      enabled={true}
-                      onChange={handleCorrectionChange}
-                    />
-                  </div>
-                )}
-
-                {/* SAVE BUTTON */}
-                {matchStatus !== null && (
-                  <button
-                    onClick={handleSave}
-                    className={`px-6 py-2 rounded text-white ${
-                      matchStatus === true
-                        ? "bg-green-600 hover:bg-green-700"
-                        : "bg-blue-600 hover:bg-blue-700"
-                    }`}
-                  >
-                    Save Verification
-                  </button>
-                )}
-              </>
-            )}
-
-            {saved && (
-              <div className="bg-green-50 border border-green-300 text-green-700 p-4 rounded">
-                ✔ Verification completed and locked
+                <div
+                  className={`verify-option${verifyChoice === "no" ? " sel-no" : ""}`}
+                  onClick={() => handleVerify("no")}
+                >
+                  <div className="radio-circle">{verifyChoice === "no" && <div className="radio-filled" />}</div>
+                  NO - Enter BMC Values
+                </div>
               </div>
+            </div>
+
+            {verifyChoice === "no" && (
+              <BMCPanel bmcRows={bmcRows} onChange={handleBmcChange} societyRows={rows} societyName={selectedSoc.name} />
             )}
+
+            <div className="save-row">
+              {saveError && <span className="save-error">{saveError}</span>}
+              <button className="save-btn" onClick={handleSave}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+                Save Verification
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="empty-state">
+            <svg
+              width="48"
+              height="48"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              style={{ opacity: 0.35 }}
+            >
+              <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Select a society to begin</div>
+            <div style={{ fontSize: 13 }}>Choose a society from the dropdown above</div>
           </div>
         )}
       </div>
+
+      {saveModal && <SaveModal record={saveModal} onClose={() => setSaveModal(null)} />}
     </div>
   );
 }

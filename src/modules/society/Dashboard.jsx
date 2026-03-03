@@ -1,4 +1,4 @@
-import {
+﻿import {
   LineChart,
   Line,
   XAxis,
@@ -6,59 +6,515 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
+import { useEffect } from "react";
+import jsPDF from "jspdf";
+import dashboardData from "../../api/dashboard.json";
+import mockDispatchData from "../../api/dispatch";
+import { downloadDispatchPdf } from "../../utils/dispatchPdf";
 
-const milkData = [
-  { day: "Mon", quantity: 420 },
-  { day: "Tue", quantity: 380 },
-  { day: "Wed", quantity: 510 },
-  { day: "Thu", quantity: 460 },
-  { day: "Fri", quantity: 600 },
-  { day: "Sat", quantity: 720 },
-];
+/* -------------------- DATA -------------------- */
+
+const COLORS = ["#1E4B6B", "#9DB5CC"];
+
+/* -------------------- COMPONENT -------------------- */
 
 export default function Dashboard() {
+  const username = localStorage.getItem("society_name");
+  const avatarLetter = username ? username.charAt(0).toUpperCase() : "";
+  const {
+    summary,
+    milkBreakdown,
+    revenue,
+    feedMineral,
+    updatedOn,
+  } = dashboardData;
+
+  useEffect(() => {
+    document.body.classList.add("dashboard-no-scroll");
+    return () => {
+      document.body.classList.remove("dashboard-no-scroll");
+    };
+  }, []);
+
+  const handleDownloadDashboard = () => {
+    const pdf = new jsPDF("portrait", "mm", "a4");
+    let y = 14;
+
+    const drawTable = (headers, rows, colWidths, startY) => {
+      const marginX = 10;
+      const rowHeight = 7;
+      let yPos = startY;
+
+      const truncate = (text, maxWidth) => {
+        const str = String(text);
+        if (pdf.getTextWidth(str) <= maxWidth) return str;
+        let out = str;
+        while (out.length > 0 && pdf.getTextWidth(`${out}...`) > maxWidth) {
+          out = out.slice(0, -1);
+        }
+        return `${out}...`;
+      };
+
+      const drawRow = (cells, isHeader = false) => {
+        let x = marginX;
+        pdf.setFont("helvetica", isHeader ? "bold" : "normal");
+        pdf.setFontSize(9);
+        if (isHeader) {
+          pdf.setFillColor(0, 0, 0);
+          pdf.setTextColor(255, 255, 255);
+        } else {
+          pdf.setFillColor(255, 255, 255);
+          pdf.setTextColor(0, 0, 0);
+        }
+        cells.forEach((cell, idx) => {
+          pdf.setDrawColor(0, 0, 0);
+          pdf.rect(x, yPos, colWidths[idx], rowHeight, isHeader ? "F" : undefined);
+          const text = truncate(cell, colWidths[idx] - 2);
+          pdf.text(text, x + 1.5, yPos + 4.8);
+          x += colWidths[idx];
+        });
+        yPos += rowHeight;
+      };
+
+      const ensureSpace = () => {
+        if (yPos + rowHeight > 287) {
+          pdf.addPage();
+          yPos = 12;
+          drawRow(headers, true);
+        }
+      };
+
+      drawRow(headers, true);
+      rows.forEach((row) => {
+        ensureSpace();
+        drawRow(row, false);
+      });
+
+      return yPos;
+    };
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(14);
+    pdf.text("DASHBOARD REPORT", 105, y, { align: "center" });
+
+    y += 6;
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Updated On: ${updatedOn}`, 105, y, { align: "center" });
+
+    y += 10;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Summary", 10, y);
+    y += 6;
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Today's Total Milk: ${summary.totalMilk} L`, 10, y);
+    pdf.text(`Total Farmers: ${summary.totalFarmers}`, 110, y);
+    y += 6;
+    pdf.text(`Morning: ${summary.session.morning} L`, 10, y);
+    pdf.text(`Evening: ${summary.session.evening} L`, 110, y);
+    y += 6;
+    pdf.text(`Buffalo: ${summary.type.buffalo} L`, 10, y);
+    pdf.text(`Cow: ${summary.type.cow} L`, 110, y);
+
+    y += 10;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Milk Breakdown", 10, y);
+    y += 6;
+    pdf.setFont("helvetica", "normal");
+    milkBreakdown.forEach((m) => {
+      pdf.text(`${m.name}: ${m.value} L`, 10, y);
+      y += 5;
+    });
+
+    y += 5;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Cattle Feed & Mineral Mix", 10, y);
+    y += 6;
+    y = drawTable(
+      ["Item", "Qty", "Last Received"],
+      feedMineral.map((f) => [f.name, f.qty, f.lastReceived]),
+      [70, 30, 70],
+      y
+    );
+
+    y += 5;
+    pdf.setFont("helvetica", "bold");
+    pdf.text("Revenue", 10, y);
+    y += 6;
+    y = drawTable(
+      ["Month", "Buffalo", "Cow"],
+      revenue.map((r) => [r.month.slice(0, 3), r.buffalo, r.cow]),
+      [30, 40, 40],
+      y
+    );
+
+    pdf.save("dashboard_report.pdf");
+  };
+
+  const handleDownloadDispatchSheet = () => {
+    downloadDispatchPdf(mockDispatchData);
+  };
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-
-      {/* KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-gray-500 text-sm">Today’s Milk Collection</p>
-          <p className="text-2xl font-bold">1,245 L</p>
+    <div className="bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] min-h-screen p-6 text-[#0F1E33] select-none cursor-default font-bold">
+      {/* HEADER */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <svg className="w-5 h-5 text-[#1E4B6B]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+          <h2 className="font-semibold text-[#1E4B6B]">Dashboard</h2>
         </div>
 
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-gray-500 text-sm">Average Fat %</p>
-          <p className="text-2xl font-bold">3.8%</p>
-        </div>
-
-        <div className="bg-white p-4 rounded shadow">
-          <p className="text-gray-500 text-sm">Active Members</p>
-          <p className="text-2xl font-bold">86</p>
+        <div className="flex items-center gap-3 text-sm text-[#5B6B7F]">
+          {username && <span className="hidden md:inline">{username}</span>}
+          {username && (
+            <div className="w-7 h-7 rounded-full bg-[#EAF1FF] text-[#1E4B6B] flex items-center justify-center">
+              {avatarLetter}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* CHART */}
-      <div className="bg-white p-4 rounded shadow h-80">
-        <p className="font-medium mb-2">Weekly Milk Collection (Litres)</p>
+      {/* TOP STATS */}
+      <div className="flex flex-nowrap items-center gap-4 mb-8">
+        {/* Total Milk */}
+        <div className="border border-[#D7E4FF] rounded-lg p-3 w-60 h-24 bg-[#F7FAFF] shadow-[0_6px_14px_rgba(15,41,74,0.12)] flex items-center gap-3">
+          <div className="w-11 h-11 rounded-md bg-[#EAF1FF] border border-[#D7E4FF] flex items-center justify-center text-[#1E4B6B]"><svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2.7 6.3 8.4a8 8 0 1 0 11.4 0L12 2.7z" /></svg></div>
+          <div>
+            <div className="text-[13px] text-[#5B6B7F] font-medium">Today's Total Milk</div>
+            <p className="text-[24px] font-semibold text-[#1E4B6B] leading-none mt-1">{summary.totalMilk} L</p>
+          </div>
+        </div>
 
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={milkData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="day" />
-            <YAxis />
-            <Tooltip />
-            <Line
-              type="monotone"
-              dataKey="quantity"
-              stroke="#0891b2"
-              strokeWidth={2}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        {/* Total Farmers */}
+        <div className="border border-[#CFE0FF] rounded-lg p-3 w-60 h-24 bg-[#F3F7FF] shadow-[0_6px_14px_rgba(15,41,74,0.12)] flex items-center gap-3">
+          <div className="w-11 h-11 rounded-md bg-[#EAF1FF] border border-[#DCE8FF] flex items-center justify-center text-[#1E4B6B]"><svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="7" r="4" /><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg></div>
+          <div>
+            <div className="text-[13px] text-[#5B6B7F] font-medium">Total Farmers</div>
+            <p className="text-[24px] font-semibold text-[#1E4B6B] leading-none mt-1">{summary.totalFarmers}</p>
+          </div>
+        </div>
+
+        {/* Morning / Evening */}
+        <div className="border border-[#D7E4FF] rounded-lg p-3 w-64 h-24 bg-[#F7FAFF] shadow-[0_6px_14px_rgba(15,41,74,0.12)] flex items-center gap-3">
+          <div className="w-11 h-11 rounded-md bg-[#EAF1FF] border border-[#D7E4FF] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-[#1E4B6B] flex items-center justify-center">
+              <svg className="w-4.5 h-4.5 text-[#EAF1FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <circle cx="12" cy="12" r="7.5" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+            </div>
+          </div>
+          <div className="flex-1">
+            <div className="text-[13px] text-[#5B6B7F] font-medium mb-1">Types Of Milk</div>
+            <div className="flex gap-6">
+              <div>
+                <span className="text-[12px] text-[#6B7FA0] flex items-center gap-1">
+                  <svg className="w-4 h-4 text-[#6B7FA0]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 15h16" />
+                    <path d="M7 13l2-2 2 2" />
+                    <path d="M12 6a6 6 0 0 0-6 6" />
+                    <path d="M12 6a6 6 0 0 1 6 6" />
+                    <path d="M12 2v2" />
+                    <path d="M3 17h1M20 17h1" />
+                    <path d="M6 9h1M17 9h1" />
+                  </svg>
+                  Morning
+                </span>
+                <p className="font-semibold text-[16px] text-[#1E4B6B] leading-none mt-1">{summary.session.morning} L</p>
+              </div>
+              <div>
+                <span className="text-[12px] text-[#6B7FA0] flex items-center gap-1">
+                  <svg className="w-4 h-4 text-[#6B7FA0]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 15h16" />
+                    <path d="M13 13l2 2 2-2" />
+                    <path d="M12 6a6 6 0 0 0-6 6" />
+                    <path d="M12 6a6 6 0 0 1 6 6" />
+                    <path d="M12 2v2" />
+                    <path d="M3 17h1M20 17h1" />
+                    <path d="M6 9h1M17 9h1" />
+                  </svg>
+                  Evening
+                </span>
+                <p className="font-semibold text-[16px] text-[#1E4B6B] leading-none mt-1">{summary.session.evening} L</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Buffalo / Cow */}
+        <div className="border border-[#CFE3FF] rounded-lg p-3 w-64 h-24 bg-[#F3F7FF] shadow-[0_6px_14px_rgba(15,41,74,0.12)] flex items-center gap-3">
+          <div className="w-11 h-11 rounded-md bg-[#EAF1FF] border border-[#DCE8FF] flex items-center justify-center text-[#1E4B6B]">
+            <svg className="w-6 h-6" viewBox="0 0 64 64" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M24 6h16v6l-2 2v8l6 8a15 15 0 0 1 3 9v16c0 5-4 9-9 9H26c-5 0-9-4-9-9V39c0-3 1-6 3-9l6-8v-8l-2-2V6z"
+              />
+              <path
+                fill="#FFFFFF"
+                d="M23 33c2-3 5-5 9-5s7 2 9 5v11c0 3-2 6-6 6H20c-3 0-6-3-6-6V33h9z"
+              />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <div className="text-[13px] text-[#5B6B7F] font-medium mb-1">Types Of Milk</div>
+            <div className="flex gap-6">
+              <div>
+                <span className="text-[12px] text-[#5E6B84] flex items-center gap-1.5">
+                  <svg
+                    className="w-4 h-4 text-[#1E4B6B]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 12c0-3.5 3.6-6 8-6s8 2.5 8 6v2c0 2.8-2.5 5-5.5 5h-5C6.5 19 4 16.8 4 14z" />
+                    <path d="M6 7 3 5M18 7l3-2" />
+                    <path d="M9 14h.01M15 14h.01" />
+                    <path d="M10 17c1.2.8 2.8.8 4 0" />
+                  </svg>
+                  Buffalo
+                </span>
+                <p className="font-semibold text-[18px] text-[#1E4B6B] leading-none mt-1">{summary.type.buffalo} L</p>
+              </div>
+              <div>
+                <span className="text-[12px] text-[#5E6B84] flex items-center gap-1.5">
+                  <svg
+                    className="w-4 h-4 text-[#1E4B6B]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12c0-3 3-5 7-5s7 2 7 5v3c0 2.8-2.2 5-5 5H10c-2.8 0-5-2.2-5-5z" />
+                    <path d="M6 7 3 5M18 7l3-2" />
+                    <circle cx="9" cy="13" r="1" fill="currentColor" stroke="none" />
+                    <circle cx="15" cy="13" r="1" fill="currentColor" stroke="none" />
+                    <path d="M10 16c1.2.8 2.8.8 4 0" />
+                    <path
+                      d="M12.5 9.5c1.3 0 2.4 1 2.4 2.2 0 1.7-1.8 2.8-3.5 2.2-1.2-.4-1.9-1.5-1.9-2.6 0-1 0.9-1.8 2-1.8z"
+                      fill="currentColor"
+                      stroke="none"
+                    />
+                  </svg>
+                  Cow
+                </span>
+                <p className="font-semibold text-[18px] text-[#1E4B6B] leading-none mt-1">{summary.type.cow} L</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handleDownloadDispatchSheet}
+          className="ml-auto bg-[#1E4B6B] hover:bg-[#163A54] text-white px-6 py-2.5 rounded-md font-semibold shadow-[0_8px_18px_rgba(15,41,74,0.25)] flex items-center gap-2 whitespace-nowrap"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 3v12" />
+            <path d="M7 10l5 5 5-5" />
+            <path d="M5 21h14" />
+          </svg>
+          Generate Dispatch Sheet
+        </button>
+      </div>
+
+      {/* MAIN GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* MILK BREAKDOWN */}
+        <div className="border border-[#D7E4FF] rounded-xl p-5 bg-[#F7FAFF] shadow-[0_8px_18px_rgba(15,41,74,0.08)] flex flex-col h-full">
+          <h3 className="text-sm font-semibold text-[#1E4B6B]">Milk Breakdown</h3>
+          <div className="mt-2 flex items-center gap-4 text-[11px] text-[#6B7FA0]">
+            {milkBreakdown.map((item, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: COLORS[index] }}
+                />
+                <span>{item.name}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 flex justify-center">
+            <PieChart width={260} height={260}>
+              <Tooltip />
+              <Pie
+                data={milkBreakdown}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={100}
+                paddingAngle={3}
+                dataKey="value"
+              >
+                {milkBreakdown.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index]} />
+                ))}
+              </Pie>
+            </PieChart>
+          </div>
+        </div>
+
+        {/* FEED */}
+        <div className="border border-[#D7E4FF] rounded-xl bg-[#F7FAFF] shadow-[0_8px_18px_rgba(15,41,74,0.08)] overflow-hidden flex flex-col h-full">
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-[#1E4B6B]">Cattle Feed & Mineral Mix</h3>
+
+            <div className="mt-4 space-y-6 text-sm">
+              {feedMineral.map((item, index) => (
+                <div key={item.name}>
+                <div className="flex items-center justify-between font-semibold text-[#1E4B6B]">
+                    <span className="flex items-center gap-2">
+                      {index === 0 ? (
+                        <svg
+                          className="w-5 h-5 text-[#1E4B6B]"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 21V10" />
+                          <path d="M12 10c-3.8 0-6-2.6-6-5.7C6 3.2 7.8 2 10 2c3.8 0 6 3.2 6 6 0 .7-.1 1.4-.3 2" />
+                          <path d="M12 10c3.8 0 6-2.6 6-5.7C18 3.2 16.2 2 14 2c-3.8 0-6 3.2-6 6 0 .7.1 1.4.3 2" />
+                          <path d="M12 18c-2.6 0-4.7-1.8-4.7-4.1 0-2 1.6-3.5 4.7-3.5 3.1 0 4.7 1.6 4.7 3.5 0 2.3-2.1 4.1-4.7 4.1z" />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="w-5 h-5 text-[#1E4B6B]"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none" />
+                          <path d="M4.2 12c2.3-3.3 5-5 7.8-5s5.5 1.7 7.8 5c-2.3 3.3-5 5-7.8 5s-5.5-1.7-7.8-5z" />
+                          <path d="M7 5.2c2 1.2 3.5 2.6 4.6 4.2" />
+                          <path d="M17 18.8c-2-1.2-3.5-2.6-4.6-4.2" />
+                          <path d="M17 5.2c-2 1.2-3.5 2.6-4.6 4.2" />
+                          <path d="M7 18.8c2-1.2 3.5-2.6 4.6-4.2" />
+                        </svg>
+                      )}
+                      {item.name}
+                    </span>
+                    <span>{item.qty}</span>
+                  </div>
+                  <div className="mt-1 flex justify-between text-xs text-[#5B6B7F]">
+                    <span>Last Received On</span>
+                    <span>{item.lastReceived}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-[#D7E4FF] p-4 mt-auto">
+            <button
+              onClick={handleDownloadDashboard}
+              className="mx-auto border border-[#1E4B6B] text-[#1E4B6B] px-4 py-2 rounded font-semibold flex items-center justify-center gap-2 bg-[#F1F6FF]"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 3v12" />
+                <path d="M7 10l5 5 5-5" />
+                <path d="M5 21h14" />
+              </svg>
+              Download Report
+            </button>
+          </div>
+        </div>
+
+        {/* REVENUE */}
+        <div className="border border-[#D7E4FF] rounded-xl bg-[#F7FAFF] shadow-[0_8px_18px_rgba(15,41,74,0.08)] overflow-hidden flex flex-col h-full">
+          <div className="p-5">
+            <h3 className="text-sm font-semibold text-[#1E4B6B]">Revenue</h3>
+
+            <div className="mt-3 flex justify-end gap-4 text-xs text-[#6B7FA0]">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[0] }} />
+                Buffalo Milk
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[1] }} />
+                Cow Milk
+              </div>
+            </div>
+
+            <div className="mt-2">
+              <ResponsiveContainer width="100%" height={220}>
+              <LineChart
+                data={revenue}
+                margin={{ left: 4, right: 16, top: 6, bottom: 12 }}
+              >
+                <CartesianGrid stroke="#E1E6EB" vertical={false} />
+                <XAxis
+                  dataKey="month"
+                  tickFormatter={(v) => v.slice(0, 3)}
+                  tick={{ fontSize: 11, fill: "#6B7FA0" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickMargin={8}
+                  interval={0}
+                  padding={{ left: 6, right: 12 }}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#6B7FA0" }}
+                  axisLine={false}
+                  tickLine={false}
+                  label={{
+                    value: "Security Rating",
+                    angle: -90,
+                    position: "insideLeft",
+                    style: { fill: "#6B7FA0", fontSize: 11 },
+                  }}
+                />
+                <Tooltip />
+                <Line type="monotone" dataKey="buffalo" stroke={COLORS[0]} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="cow" stroke={COLORS[1]} strokeWidth={2} dot={false} />
+              </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mt-1 text-center text-xs text-[#6B7FA0]">Month</div>
+          </div>
+
+          <div className="border-t border-[#D7E4FF] p-4 mt-auto">
+            <button
+              onClick={handleDownloadDashboard}
+              className="mx-auto border border-[#1E4B6B] text-[#1E4B6B] px-4 py-2 rounded font-semibold flex items-center justify-center gap-2 bg-[#F1F6FF]"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 3v12" />
+                <path d="M7 10l5 5 5-5" />
+                <path d="M5 21h14" />
+              </svg>
+              Download Report
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+
+
+
+
