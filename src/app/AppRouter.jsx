@@ -58,6 +58,7 @@ export default function AppRouter() {
 
         {/* ================= ADMIN ROUTES ================= */}
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/login/admin" element={<AdminLogin />} />
 
         <Route
           path="/admin"

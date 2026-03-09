@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { fetchRequests, approveRequest, rejectRequest } from "../../api/admin";
+﻿import { useState, useEffect } from "react";
+import { listRequests, updateRequest } from "../../utils/api";
 
 export default function Requests() {
   const [requests, setRequests] = useState([]);
@@ -11,23 +11,24 @@ export default function Requests() {
 
   const loadRequests = async () => {
     setLoading(true);
-    const data = await fetchRequests();
-    setRequests(data);
-    setLoading(false);
+    try {
+      const res = await listRequests();
+      setRequests(res?.data || []);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleApprove = async (reqId) => {
     if (!confirm("Approve this request?")) return;
-
-    await approveRequest(reqId);
+    await updateRequest(reqId, { status: "approved" });
     alert("Request approved");
     loadRequests();
   };
 
   const handleReject = async (reqId) => {
     if (!confirm("Reject this request?")) return;
-
-    await rejectRequest(reqId);
+    await updateRequest(reqId, { status: "rejected" });
     alert("Request rejected");
     loadRequests();
   };
@@ -42,19 +43,19 @@ export default function Requests() {
         <p className="text-gray-500">No requests found</p>
       ) : (
         <div className="space-y-4">
-          {requests.map(req => (
+          {requests.map((req) => (
             <div
-              key={req.id}
+              key={req._id || req.id}
               className="bg-white p-4 rounded shadow border-l-4 border-cyan-700"
             >
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <p className="font-semibold">{req.username}</p>
+                  <p className="font-semibold">{req.username || req.userId || "User"}</p>
                   <p className="text-sm text-gray-600">
-                    Role: {req.role} • Type: {req.type}
+                    Role: {req.role || "N/A"} - Type: {req.type}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {new Date(req.requestedAt).toLocaleString()}
+                    {new Date(req.createdAt || req.requestedAt || Date.now()).toLocaleString()}
                   </p>
                 </div>
                 <span
@@ -70,20 +71,18 @@ export default function Requests() {
                 </span>
               </div>
 
-              {req.message && (
-                <p className="text-sm mb-3">{req.message}</p>
-              )}
+              {req.message && <p className="text-sm mb-3">{req.message}</p>}
 
               {req.status === "pending" && (
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleApprove(req.id)}
+                    onClick={() => handleApprove(req._id || req.id)}
                     className="px-4 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                   >
                     Approve
                   </button>
                   <button
-                    onClick={() => handleReject(req.id)}
+                    onClick={() => handleReject(req._id || req.id)}
                     className="px-4 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                   >
                     Reject

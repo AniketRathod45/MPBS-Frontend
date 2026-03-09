@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
-import { fetchUsers, createUser } from "../../api/admin";
+﻿import { useState, useEffect } from "react";
 import AddUserModal from "./components/AddUserModal";
+import { listUsers, createUser } from "../../utils/api";
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadUsers();
@@ -13,20 +14,32 @@ export default function UserManagement() {
 
   const loadUsers = async () => {
     setLoading(true);
-    const data = await fetchUsers();
-    setUsers(data);
-    setLoading(false);
+    setError("");
+    try {
+      const res = await listUsers();
+      setUsers(res?.data || []);
+    } catch (err) {
+      setError(err.message || "Failed to load users");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddUser = async (userData) => {
-    const res = await createUser(userData);
-    
-    if (res.success) {
+    setError("");
+    try {
+      const role = userData.role === "Other Users" ? "Other" : userData.role;
+      await createUser({
+        username: userData.username,
+        password: userData.password,
+        role,
+        profile: userData,
+      });
       alert("User added successfully");
       setShowModal(false);
-      loadUsers();
-    } else {
-      alert(res.message);
+      await loadUsers();
+    } catch (err) {
+      setError(err.message || "Failed to add user");
     }
   };
 
@@ -36,11 +49,15 @@ export default function UserManagement() {
         <h1 className="text-xl font-semibold">User Management</h1>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-cyan-700 text-white px-4 py-2 rounded hover:bg-cyan-800"
+          className="rounded-lg bg-[#1E4B6B] px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_18px_rgba(30,75,107,0.22)] transition hover:bg-[#163A54]"
         >
           Add User
         </button>
       </div>
+
+      {error && (
+        <p className="mb-3 text-sm text-red-600">{error}</p>
+      )}
 
       {loading ? (
         <p>Loading...</p>
@@ -58,7 +75,7 @@ export default function UserManagement() {
             </thead>
             <tbody>
               {users.map((user, index) => (
-                <tr key={user.id}>
+                <tr key={user._id || user.id}>
                   <td className="border px-4 py-2 text-center">{index + 1}</td>
                   <td className="border px-4 py-2">{user.username}</td>
                   <td className="border px-4 py-2">{user.role}</td>

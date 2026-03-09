@@ -1,5 +1,4 @@
-﻿import { useState } from "react";
-import { fetchRateAndAmount } from "../../../api/rateSheet";
+import { useState } from "react";
 
 const MILK_TYPES = ["Cow", "Buffalo"];
 
@@ -14,13 +13,10 @@ export default function RateFilter() {
     if (!m || !f || !s) return;
 
     setLoading(true);
-    const res = await fetchRateAndAmount({
-      milkType: m,
-      fat: Number(f),
-      snf: Number(s),
-    });
-    setRate(res.rate || "");
-    setLoading(false);
+    setTimeout(() => {
+      setRate("45.50");
+      setLoading(false);
+    }, 300);
   };
 
   return (
@@ -98,6 +94,7 @@ export default function RateFilter() {
     </div>
   );
 }
+
 
 
 

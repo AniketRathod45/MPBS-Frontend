@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import {
   ResponsiveContainer,
@@ -14,37 +14,84 @@ import {
   Line,
   Tooltip,
 } from "recharts";
-// import mockDispatchData from "../../api/dispatch";
-// import { downloadDispatchPdf } from "../../utils/dispatchPdf";
-import dashboardData from "../../api/dashboard.json";
-import bmcDashboardData from "../../api/bmcDashboard.json";
+import { getBmcDashboard, getReportQuality, getReportOverheads } from "../../utils/api";
 
 const milkShareColors = ["#1E4B6B", "#9DB5CC"];
-
-const { milkProcuredByMonth, milkRejectedByMonth, monthQuality, overheads, societiesVerified, dispatchStatus } =
-  bmcDashboardData;
 
 export default function BmcDashboard() {
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const username = localStorage.getItem("bmc_name") || "Username";
   const avatarLetter = username ? username.charAt(0).toUpperCase() : "";
-  const [monthProcured, setMonthProcured] = useState("Dec");
-  const [monthRejected, setMonthRejected] = useState("Dec");
-  const [monthQualityFilter, setMonthQualityFilter] = useState("Dec");
-  const [monthOverheads, setMonthOverheads] = useState("Dec");
+  
+  // State for dashboard data
+  const [summary, setSummary] = useState(null);
+  const [milkBreakdown, setMilkBreakdown] = useState([]);
+  const [milkProcuredByMonth, setMilkProcuredByMonth] = useState({});
+  const [milkRejectedByMonth, setMilkRejectedByMonth] = useState({});
+  const [dispatchStats, setDispatchStats] = useState(null);
+  const [monthQualityData, setMonthQualityData] = useState([]);
+  const [overheadData, setOverheadData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  const [monthProcured, setMonthProcured] = useState("Jan");
+  const [monthRejected, setMonthRejected] = useState("Jan");
+  const [monthQualityFilter, setMonthQualityFilter] = useState("Jan");
+  const [monthOverheads, setMonthOverheads] = useState("Jan");
 
-  const { summary, milkBreakdown } = dashboardData;
-  const totalMilk = milkBreakdown.reduce((sum, item) => sum + item.value, 0);
-  const milkShare = milkBreakdown.map((item, index) => ({
-    name: item.name,
-    value: totalMilk > 0 ? Number(((item.value / totalMilk) * 100).toFixed(2)) : 0,
-    color: milkShareColors[index] || "#1E4B6B",
-  }));
-  const milkProcured = milkProcuredByMonth[monthProcured] || [];
-  const milkRejected = milkRejectedByMonth[monthRejected] || [];
+  // Fetch dashboard data
+  useEffect(() => {
+    let active = true;
+
+    async function loadBmcDashboard() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const bmcId = localStorage.getItem("bmc_id") || localStorage.getItem("bmc_name") || "";
+        const response = await getBmcDashboard({ bmcId });
+        const data = response?.data || {};
+
+        const [qualityRes, overheadRes] = await Promise.all([
+          getReportQuality({}),
+          getReportOverheads({ bmcId }),
+        ]);
+
+        if (!active) return;
+        setSummary(
+          data.summary || {
+            totalMilk: 0,
+            totalVerified: 0,
+            type: { cow: 0, buffalo: 0 },
+          }
+        );
+        setMilkBreakdown(data.milkBreakdown || []);
+        setMilkProcuredByMonth(data.milkProcuredByMonth || {});
+        setMilkRejectedByMonth(data.milkRejectedByMonth || {});
+        setDispatchStats(data.dispatchStats || { totalDispatches: 0, pendingDispatches: 0 });
+        const qualityList = qualityRes?.data || [];
+        const overheadList = overheadRes?.data || [];
+        setMonthQualityData(qualityList);
+        setOverheadData(overheadList);
+        if (qualityList.length) setMonthQualityFilter(qualityList[0].name);
+        if (overheadList.length) setMonthOverheads(overheadList[0].name);
+
+        setLoading(false);
+      } catch (err) {
+        if (!active) return;
+        console.error("Error loading BMC dashboard:", err);
+        setError(err.message);
+        setLoading(false);
+      }
+    }
+
+    loadBmcDashboard();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // const handleDownloadDispatchSheet = () => {
-  //   downloadDispatchPdf(mockDispatchData);
   // };
   const downloadPdfTable = ({ title, subtitle, headers, rows, filename }) => {
     if (!rows || rows.length === 0) return;
@@ -102,6 +149,64 @@ export default function BmcDashboard() {
 
     pdf.save(filename);
   };
+
+  // Compute derived values
+  const totalMilk = milkBreakdown.reduce((sum, item) => sum + item.value, 0);
+  const milkShare = milkBreakdown.map((item, index) => ({
+    name: item.name,
+    value: totalMilk > 0 ? Number(((item.value / totalMilk) * 100).toFixed(2)) : 0,
+    color: milkShareColors[index] || "#1E4B6B",
+  }));
+  const milkProcured = milkProcuredByMonth[monthProcured] || [];
+  const milkRejected = milkRejectedByMonth[monthRejected] || [];
+  const societiesVerified = dispatchStats
+    ? {
+        verified: Math.max(0, dispatchStats.totalDispatches - dispatchStats.pendingDispatches),
+        total: dispatchStats.totalDispatches,
+      }
+    : { verified: 0, total: 0 };
+  const dispatchStatus = dispatchStats && dispatchStats.pendingDispatches > 0 ? "Pending" : "On Time";
+  const monthQuality = monthQualityData;
+  const overheads = overheadData;
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-full bg-[#F8F6F2] p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E4B6B]"></div>
+          <p className="mt-4 text-[#5B6B7F]">Loading BMC dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-full bg-[#F8F6F2] p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-lg mb-4">âš ï¸ Error Loading Dashboard</div>
+          <p className="text-[#5B6B7F] mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-[#1E4B6B] text-white rounded-lg hover:bg-[#162d47]"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback for missing data
+  if (!summary || !milkBreakdown || milkBreakdown.length === 0) {
+    return (
+      <div className="min-h-full bg-[#F8F6F2] p-6 flex items-center justify-center">
+        <p className="text-[#5B6B7F]">No data available</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-[#F8F6F2] p-6 text-[#1F2A44]">
@@ -456,3 +561,15 @@ export default function BmcDashboard() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+

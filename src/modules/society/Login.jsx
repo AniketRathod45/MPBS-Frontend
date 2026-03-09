@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { login } from "../../utils/api";
 
 export default function SocietyLogin() {
   const navigate = useNavigate();
@@ -9,10 +10,10 @@ export default function SocietyLogin() {
     username: "",
     password: "",
   });
-  const snakePattern =
+  const dotPattern =
     "data:image/svg+xml;utf8," +
     encodeURIComponent(
-      "<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><g stroke='white' stroke-opacity='0.45' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'><path d='M20 30c20 0 20 40 40 40s20-40 40-40 20 40 40 40'/><path d='M20 90c20 0 20 40 40 40s20-40 40-40 20 40 40 40'/><path d='M60 10c0 20-20 20-20 40s20 20 20 40-20 20-20 40'/></g><g stroke='white' stroke-opacity='0.45' stroke-width='6' fill='none'><circle cx='20' cy='30' r='8'/><circle cx='60' cy='70' r='8'/><circle cx='100' cy='30' r='8'/><circle cx='140' cy='70' r='8'/><circle cx='20' cy='90' r='8'/><circle cx='60' cy='130' r='8'/><circle cx='100' cy='90' r='8'/><circle cx='140' cy='130' r='8'/></g></svg>"
+      "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><g fill='rgba(255,255,255,0.6)'><circle cx='10' cy='10' r='2.2'/><circle cx='40' cy='10' r='2.2'/><circle cx='70' cy='10' r='2.2'/><circle cx='100' cy='10' r='2.2'/><circle cx='10' cy='40' r='2.2'/><circle cx='40' cy='40' r='2.2'/><circle cx='70' cy='40' r='2.2'/><circle cx='100' cy='40' r='2.2'/><circle cx='10' cy='70' r='2.2'/><circle cx='40' cy='70' r='2.2'/><circle cx='70' cy='70' r='2.2'/><circle cx='100' cy='70' r='2.2'/><circle cx='10' cy='100' r='2.2'/><circle cx='40' cy='100' r='2.2'/><circle cx='70' cy='100' r='2.2'/><circle cx='100' cy='100' r='2.2'/></g></svg>"
     );
 
   const handleChange = (e) => {
@@ -20,27 +21,34 @@ export default function SocietyLogin() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // TEMP DUMMY AUTH (backend later)
-    const SOCIETY_USERNAME = "SOCIETY_001";
-    const SOCIETY_PASSWORD = "password123";
-
-    if (
-      form.username === SOCIETY_USERNAME &&
-      form.password === SOCIETY_PASSWORD
-    ) {
+    try {
+      const res = await login({ username: form.username, password: form.password });
+      const user = res?.user;
+      
+      if (!user) {
+        alert("Login failed - no user data received");
+        return;
+      }
+      
+      if (user.role !== "Society") {
+        alert(`Not authorized - This is a ${user.role} account. Please use Society login credentials.`);
+        return;
+      }
+      localStorage.setItem("auth_token", res.token);
+      localStorage.setItem("user_role", user.role);
+      localStorage.setItem("user_id", user.id);
       localStorage.setItem("society_auth", "true");
-
-      // STORE WHATEVER SOCIETY LOGS IN
-      localStorage.setItem("society_name", form.username);
+      localStorage.setItem("society_name", user.username);
+      localStorage.setItem("society_id", user.username);
       localStorage.removeItem("bmc_auth");
       localStorage.removeItem("bmc_name");
-
+      localStorage.removeItem("bmc_id");
       navigate("/");
-    } else {
-      alert("Invalid Username or Password");
+    } catch (err) {
+      alert(err.message || "Invalid Username or Password");
     }
   };
 
@@ -51,10 +59,12 @@ export default function SocietyLogin() {
         <div className="relative hidden overflow-hidden bg-[#2b5874] lg:flex lg:items-center lg:justify-start lg:pl-24">
           {/* Diamond tessellation with vertex dots */}
           <div
-            className="pointer-events-none absolute left-0 top-0 h-[50%] w-[55%]"
+            className="pointer-events-none absolute left-0 top-0 h-64 w-80"
             style={{
-              backgroundImage: `url("${snakePattern}")`,
-              backgroundSize: "140px 140px",
+              backgroundImage: `url("${dotPattern}")`,
+              backgroundSize: "40px 40px",
+              backgroundRepeat: "repeat",
+              backgroundPosition: "0 0",
             }}
           />
 
@@ -86,7 +96,7 @@ export default function SocietyLogin() {
             </div>
 
             <h2 className="mt-5 text-center text-[22px] font-semibold text-slate-800">
-              Welcome to Scociety
+              Welcome to Society
             </h2>
             <p className="mt-1.5 text-center text-[13.5px] text-slate-500">
               Enter your credentials to continue
@@ -100,6 +110,7 @@ export default function SocietyLogin() {
                 placeholder="Username"
                 value={form.username}
                 onChange={handleChange}
+                autoComplete="username"
                 className="w-full rounded-lg border border-[#d7dbe3] bg-white px-4 py-[11px] text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2e5d7b]"
               />
 
@@ -111,6 +122,7 @@ export default function SocietyLogin() {
                   placeholder="Password"
                   value={form.password}
                   onChange={handleChange}
+                  autoComplete="current-password"
                   className="w-full rounded-lg border border-[#d7dbe3] bg-white px-4 py-[11px] pr-11 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2e5d7b]"
                 />
                 <button
@@ -168,9 +180,11 @@ export default function SocietyLogin() {
                   <span>Remember Me</span>
                 </label>
 
+                {/*
                 <Link to="/forgot-password" className="hover:text-slate-600">
                   Forgot Password?
                 </Link>
+                */}
               </div>
 
               <button

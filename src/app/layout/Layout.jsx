@@ -1,9 +1,5 @@
-﻿import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
-import {
-  fetchNotifications,
-  markNotificationRead,
-} from "../../api/notifications";
 
 export default function Layout() {
   const navigate = useNavigate();
@@ -23,8 +19,7 @@ export default function Layout() {
 
   useEffect(() => {
     async function loadNotifications() {
-      const data = await fetchNotifications();
-      setNotifications(data);
+      setNotifications([]);
     }
     loadNotifications();
   }, []);
@@ -48,7 +43,6 @@ export default function Layout() {
 
   const handleNotificationClick = async (notif) => {
     if (!notif.read) {
-      await markNotificationRead(notif.id);
       setNotifications((prev) =>
         prev.map((n) =>
           n.id === notif.id ? { ...n, read: true } : n
@@ -213,7 +207,7 @@ export default function Layout() {
 
         </nav>
 
-        {/* âœ… SIDEBAR FOOTER (AS IN PDF) */}
+        {/* ✅ SIDEBAR FOOTER (AS IN PDF) */}
         <div className="p-4 border-t border-[#1E4B6B] text-sm">
           {/* Sidebar footer: only logout button (user requested removal of 'Logged in as') */}
           <button
@@ -240,7 +234,7 @@ export default function Layout() {
                   onClick={() => navigate(-1)}
                   className="text-sm text-[#1E4B6B] hover:underline"
                 >
-                  â† Back
+                  ← Back
                 </button>
               )}
             </div>
@@ -254,3 +248,5 @@ export default function Layout() {
     </div>
   );
 }
+
+

@@ -1,8 +1,10 @@
 ﻿import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
 import MilkCollectionTable from "./components/MilkCollectionTable";
-import { fetchRateAndAmount } from "../../api/rateSheet";
 import { getSession } from "../../utils/session";
+import { createMilkEntries } from "../../utils/api";
+
+const FIXED_RATE = 45;
 
 const createEmptyRow = () => ({
   milkType: "",
@@ -63,28 +65,39 @@ export default function MilkCollection() {
   const handleClearRow = (index, rows, setRows) =>
     setRows(rows.map((r, i) => (i === index ? createEmptyRow() : r)));
 
-  const handleChange = async (index, field, value, rows, setRows) => {
+  const handleChange = (index, field, value, rows, setRows) => {
     const updated = rows.map((r, i) =>
       i === index ? { ...r, [field]: value } : r
     );
-    setRows(updated);
-
-    if (!["milkType", "fat", "snf", "qty"].includes(field)) return;
+    if (!["milkType", "fat", "snf", "qty"].includes(field)) {
+      setRows(updated);
+      return;
+    }
 
     const row = updated[index];
-    if (!row.milkType || !row.qty) return;
+    const qty = Number(row.qty);
+    const hasValidQty = Number.isFinite(qty) && qty > 0;
+    const hasMilkType = Boolean(row.milkType);
 
-    const { rate, amount } = await fetchRateAndAmount(row);
+    setRows(
+      updated.map((r, i) => {
+        if (i !== index) return r;
+        if (!hasMilkType || !hasValidQty) {
+          return { ...r, rate: "", amount: "" };
+        }
 
-    setRows((prev) =>
-      prev.map((r, i) =>
-        i === index ? { ...r, rate, amount } : r
-      )
+        return {
+          ...r,
+          rate: FIXED_RATE.toFixed(2),
+          amount: (qty * FIXED_RATE).toFixed(2),
+        };
+      })
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const rowsToValidate = isMorning ? morningRows : eveningRows;
+    
     const hasInvalidRow = rowsToValidate.some((row) => {
       const hasAny =
         row.milkType !== "" ||
@@ -118,12 +131,52 @@ export default function MilkCollection() {
       return;
     }
 
-    setSavedData({
-      morningRows,
-      eveningRows,
-      savedAt: new Date(),
-    });
-    alert("Saved successfully.");
+    const entries = rowsToValidate
+      .filter((row) => row.milkType && row.fat && row.snf && row.qty)
+      .map((row) => ({
+        milkType: row.milkType,
+        fat: Number(row.fat),
+        snf: Number(row.snf),
+        qty: Number(row.qty),
+        rate: FIXED_RATE,
+        amount: Number(row.qty) * FIXED_RATE,
+      }));
+
+    if (entries.length === 0) {
+      alert("Please enter at least one complete milk entry.");
+      return;
+    }
+
+    const societyId = localStorage.getItem("society_id") || localStorage.getItem("society_name") || "";
+    
+    if (!societyId) {
+      alert("Session expired. Please log in again.");
+      window.location.href = "/society/login";
+      return;
+    }
+    
+    const date = new Date().toISOString().split("T")[0];
+    const sessionLabel = isMorning ? "M" : "E";
+
+    const payload = {
+      societyId,
+      date,
+      session: sessionLabel,
+      entries,
+    };
+
+    try {
+      const response = await createMilkEntries(payload);
+
+      setSavedData({
+        morningRows,
+        eveningRows,
+        savedAt: new Date(),
+      });
+      alert("Saved successfully. " + entries.length + " entry(ies) saved.");
+    } catch (error) {
+      alert("Failed to save: " + (error.message || "Unknown error"));
+    }
   };
 
   const normalizeRows = (label, rows) =>
@@ -532,6 +585,9 @@ export default function MilkCollection() {
     </div>
   );
 }
+
+
+
 
 
 

@@ -1,12 +1,12 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
+import { fetchRateAndAmount, getMilkEntries, getSocietyDashboard } from "../../utils/api";
 import {
   ChevronDown,
   Download,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { fetchRateAndAmount } from "../../api/rateSheet";
 
 export default function RateSheet() {
   const [reportSelections, setReportSelections] = useState({
@@ -28,7 +28,7 @@ export default function RateSheet() {
   const [calcLoading, setCalcLoading] = useState(false);
 
   const [page, setPage] = useState(1);
-9
+  const [downloadLoading, setDownloadLoading] = useState(false);
   useEffect(() => {
     const handleCopy = (event) => {
       event.preventDefault();
@@ -130,13 +130,18 @@ export default function RateSheet() {
     }
 
     setCalcLoading(true);
-    const res = await fetchRateAndAmount({
-      milkType: nextType,
-      fat: fatValue,
-      snf: snfValue,
-    });
-    setCalcRate(res.rate ? String(res.rate) : "");
-    setCalcLoading(false);
+    try {
+      const res = await fetchRateAndAmount({
+        milkType: nextType,
+        fat: fatValue,
+        snf: snfValue,
+      });
+      setCalcRate(res?.rate ? String(res.rate) : "");
+    } catch (_) {
+      setCalcRate("");
+    } finally {
+      setCalcLoading(false);
+    }
   };
 
   const onSelectPeriod = (title, field, value) => {
@@ -150,9 +155,102 @@ export default function RateSheet() {
     setReportSelections((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
-  const handleDownloadAll = () => {
+  const handleDownloadAll = async () => {
     const selected = reportCards.filter((r) => reportSelections[r.title]);
     if (!selected.length) return;
+
+    const hasInvalidPeriod = selected.some((report) => {
+      const period = periods[report.title] || {};
+      return !period.from || !period.to;
+    });
+
+    if (hasInvalidPeriod) {
+      window.alert("Please select both From and To dates for all selected reports.");
+      return;
+    }
+
+    const toNum = (value) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const monthLabel = (dateValue) => {
+      const date = new Date(dateValue);
+      if (Number.isNaN(date.getTime())) return "Unknown";
+      return date.toLocaleString("en-US", { month: "short", year: "numeric" });
+    };
+
+    setDownloadLoading(true);
+
+    const societyId = localStorage.getItem("society_id") || localStorage.getItem("society_name") || "";
+    let fetched = [];
+
+    try {
+      fetched = await Promise.all(
+        selected.map(async (report) => {
+          const period = periods[report.title];
+
+          if (report.title === "Cattle Feed & Mineral Mixture") {
+            const response = await getSocietyDashboard({
+              societyId,
+              from: period.from,
+              to: period.to,
+            });
+            return {
+              title: report.title,
+              period,
+              data: {
+                feedMineral: response?.data?.feedMineral || [],
+              },
+            };
+          }
+
+          const response = await getMilkEntries({
+            societyId,
+            from: period.from,
+            to: period.to,
+          });
+
+          const entries = response?.data?.milkEntries || [];
+
+          if (report.title === "Revenue") {
+            const revenueMap = new Map();
+            entries.forEach((entry) => {
+              const label = monthLabel(entry.date);
+              const bucket = revenueMap.get(label) || { month: label, buffalo: 0, cow: 0 };
+              if (entry.milkType === "Buffalo") {
+                bucket.buffalo += toNum(entry.amount);
+              } else if (entry.milkType === "Cow") {
+                bucket.cow += toNum(entry.amount);
+              }
+              revenueMap.set(label, bucket);
+            });
+
+            const revenueArray = Array.from(revenueMap.values());
+            console.log("Revenue data for PDF:", revenueArray);
+            
+            return {
+              title: report.title,
+              period,
+              data: {
+                entries,
+                revenue: revenueArray,
+              },
+            };
+          }
+
+          return {
+            title: report.title,
+            period,
+            data: { entries },
+          };
+        })
+      );
+    } catch (error) {
+      window.alert(`Failed to fetch report data: ${error.message || "Unknown error"}`);
+      setDownloadLoading(false);
+      return;
+    }
 
     const pdf = new jsPDF();
     pdf.setFont("helvetica", "bold");
@@ -214,25 +312,96 @@ export default function RateSheet() {
       return yPos;
     };
 
-    const rows = selected.map((report) => {
-      const period = periods[report.title];
-      const from = period.from || "N/A";
-      const to = period.to || "N/A";
+    const rows = fetched.map((report) => {
+      const from = report.period.from || "N/A";
+      const to = report.period.to || "N/A";
       return [
         report.title,
         `${from} - ${to}`,
-        report.description,
+        "Fetched from backend",
       ];
     });
 
-    drawTable(
+    let y = drawTable(
       ["Report", "Period", "Description"],
       rows,
       [60, 40, 82],
       28
     );
 
+    const ensureY = (nextHeight = 14) => {
+      if (y + nextHeight > 287) {
+        pdf.addPage();
+        y = 14;
+      }
+    };
+
+    fetched.forEach((report) => {
+      ensureY(20);
+      y += 8;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text(report.title, 14, y);
+      y += 6;
+
+      if (report.title === "Revenue") {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        pdf.setTextColor(100, 100, 100);
+        pdf.text("Revenue breakdown by milk type (in Rupees)", 14, y);
+        y += 5;
+        pdf.setTextColor(0, 0, 0);
+        
+        const revenueRows = (report.data.revenue || []).map((r) => [
+          r.month || "-",
+          toNum(r.buffalo).toFixed(2),
+          toNum(r.cow).toFixed(2),
+          (toNum(r.buffalo) + toNum(r.cow)).toFixed(2),
+        ]);
+        console.log("Rendering Revenue - revenueRows:", revenueRows);
+        const tableRows = revenueRows.length
+          ? revenueRows
+          : [["No data", "0.00", "0.00", "0.00"]];
+        y = drawTable(["Month", "Buffalo (Rs)", "Cow (Rs)", "Total (Rs)"], tableRows, [40, 50, 50, 50], y + 2);
+      }
+
+      if (report.title === "Milk Collection Report") {
+        const milkRows = (report.data.entries || []).map((entry) => [
+          entry.date || "-",
+          entry.session === "M" ? "Morning" : entry.session === "E" ? "Evening" : entry.session || "-",
+          entry.milkType || "-",
+          toNum(entry.fat).toFixed(1),
+          toNum(entry.snf).toFixed(1),
+          toNum(entry.qty).toFixed(2),
+          toNum(entry.rate).toFixed(2),
+          toNum(entry.amount).toFixed(2),
+        ]);
+        const tableRows = milkRows.length
+          ? milkRows
+          : [["No data", "-", "-", "0.0", "0.0", "0.00", "0.00", "0.00"]];
+        y = drawTable(
+          ["Date", "Session", "Type", "Fat", "SNF", "Qty", "Rate", "Amount"],
+          tableRows,
+          [20, 18, 22, 16, 16, 20, 20, 24],
+          y + 2
+        );
+      }
+
+      if (report.title === "Cattle Feed & Mineral Mixture") {
+        const feedRows = (report.data.feedMineral || []).map((f) => [
+          f.name || "-",
+          f.qty || "-",
+          f.lastReceived || "-",
+        ]);
+        const tableRows = feedRows.length
+          ? feedRows
+          : [["No data", "-", "-"]];
+        y = drawTable(["Item", "Quantity", "Last Received"], tableRows, [70, 45, 50], y + 2);
+      }
+    });
+
     pdf.save("reports_download.pdf");
+    setDownloadLoading(false);
   };
 
   const handleDownloadRateSheet = () => {
@@ -349,6 +518,8 @@ export default function RateSheet() {
               >
                 <div className="flex items-start gap-2 mb-2">
                   <input
+                    id={`report-${card.title.replace(/\s+/g, '-')}`}
+                    name={`report-${card.title.replace(/\s+/g, '-')}`}
                     type="checkbox"
                     checked={reportSelections[card.title]}
                     onChange={() => toggleSelection(card.title)}
@@ -380,6 +551,8 @@ export default function RateSheet() {
                 {openPeriod === card.title && (
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <input
+                      id={`period-from-${card.title.replace(/\s+/g, '-')}`}
+                      name={`period-from-${card.title.replace(/\s+/g, '-')}`}
                       type="date"
                       value={periods[card.title].from}
                       onChange={(e) =>
@@ -388,6 +561,8 @@ export default function RateSheet() {
                       className="w-full border border-[#e2e8f0] rounded-md text-[12px] px-2 py-1"
                     />
                     <input
+                      id={`period-to-${card.title.replace(/\s+/g, '-')}`}
+                      name={`period-to-${card.title.replace(/\s+/g, '-')}`}
                       type="date"
                       value={periods[card.title].to}
                       onChange={(e) =>
@@ -405,12 +580,12 @@ export default function RateSheet() {
             <button
               onClick={handleDownloadAll}
               disabled={
-                !Object.values(reportSelections).some((selected) => selected)
+                !Object.values(reportSelections).some((selected) => selected) || downloadLoading
               }
               className="inline-flex items-center gap-2 text-[13px] font-semibold text-white bg-[#1E4B6B] px-5 py-2.5 rounded-md shadow disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download size={16} />
-              Download All
+              {downloadLoading ? "Preparing..." : "Download All"}
             </button>
           </div>
         </div>
@@ -433,6 +608,8 @@ export default function RateSheet() {
                     <span>Type</span>
                     <div className="relative">
                       <select
+                        id="milk-type-selector"
+                        name="milk-type"
                         value={calcType}
                         onChange={(e) => {
                           const next = e.target.value;
@@ -454,6 +631,8 @@ export default function RateSheet() {
                   <div className="flex items-center justify-between text-[12px] font-semibold text-slate-600">
                     <span>Fat %</span>
                     <input
+                      id="fat-percentage"
+                      name="fat-percentage"
                       type="number"
                       step="0.1"
                       value={calcFat}
@@ -482,6 +661,8 @@ export default function RateSheet() {
                   <div className="flex items-center justify-between text-[12px] font-semibold text-slate-600">
                     <span>SNF %</span>
                     <input
+                      id="snf-percentage"
+                      name="snf-percentage"
                       type="number"
                       step="0.1"
                       value={calcSnf}
@@ -592,6 +773,9 @@ export default function RateSheet() {
     </div>
   );
 }
+
+
+
 
 
 

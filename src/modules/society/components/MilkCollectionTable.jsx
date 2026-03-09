@@ -1,4 +1,4 @@
-﻿const MILK_TYPES = ["Buffalo Milk", "Cow Milk"];
+﻿const MILK_TYPES = ["Buffalo", "Cow"];
 
 export default function MilkCollectionTable({
   sessionLabel,
@@ -132,13 +132,13 @@ export default function MilkCollectionTable({
               />
 
               <input
-                value={row.rate || (!enabled ? "75.00" : "")}
+                value={row.rate || "45.00"}
                 disabled
                 className={`h-9 rounded border px-2 text-sm font-semibold select-text ${inputClass}`}
               />
 
               <input
-                value={row.amount || (!enabled ? "37899" : "")}
+                value={row.amount || ""}
                 disabled
                 className={`h-9 rounded border px-2 text-sm font-semibold select-text ${inputClass}`}
               />

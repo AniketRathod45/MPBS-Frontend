@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
+import { fetchSocieties, getMilkEntries, createVerification } from "../../utils/api";
 import "./SocietyMilkVerification.css";
 import EntryTable from "./components/EntryTable";
 import NotificationBell from "./components/NotificationBell";
 import BMCPanel from "./components/BMCPanel";
 import SaveModal from "./components/SaveModal";
 import {
-  SOCIETIES_DATA,
   INITIAL_NOTIFICATIONS,
   BMC_USER,
   calcSession,
@@ -44,8 +44,10 @@ export default function MilkVerification() {
   const dateStr = todayStr();
   const bmcUserName = localStorage.getItem("bmc_name") || BMC_USER.name;
 
-  const [societies, setSocieties] = useState(() => SOCIETIES_DATA.map((s) => ({ ...s })));
+  const [societies, setSocieties] = useState([]);
   const [selectedSoc, setSelectedSoc] = useState(null);
+  const [loadingSocieties, setLoadingSocieties] = useState(true);
+  const [societyError, setSocietyError] = useState(null);
 
   const [rows, setRows] = useState([emptyRow(), emptyRow()]);
   const [bmcRows, setBmcRows] = useState([emptyRow(), emptyRow()]);
@@ -57,7 +59,35 @@ export default function MilkVerification() {
 
   const [notifs, setNotifs] = useState(INITIAL_NOTIFICATIONS);
 
-  const handleSocietyChange = (e) => {
+  useEffect(() => {
+    async function loadSocieties() {
+      try {
+        setLoadingSocieties(true);
+        const response = await fetchSocieties();
+        const societyList = response?.data || [];
+        setSocieties(
+          societyList.map((s) => ({
+            id: s._id,
+            societyId: s.societyId,
+            name: s.societyName,
+            district: s.district,
+            taluk: s.taluk,
+            contactNumber: s.contactNumber,
+            qty: s.qty || 0,
+          }))
+        );
+      } catch (error) {
+        console.error("Error loading societies:", error);
+        setSocietyError(error.message);
+      } finally {
+        setLoadingSocieties(false);
+      }
+    }
+
+    loadSocieties();
+  }, []);
+
+  const handleSocietyChange = async (e) => {
     const name = e.target.value;
     if (!name) {
       setSelectedSoc(null);
@@ -65,10 +95,37 @@ export default function MilkVerification() {
     }
     const soc = societies.find((s) => s.name === name);
     setSelectedSoc({ ...soc });
-    setRows([emptyRow(), emptyRow()]);
-    setBmcRows([emptyRow(), emptyRow()]);
     setVerifyChoice(null);
     setSaveError("");
+
+    // Fetch milk entries for the selected society
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const response = await getMilkEntries({
+        societyId: soc.societyId,
+        date: today,
+      });
+
+      const milkData = response?.data?.milkEntries || [];
+      
+      const newRows = milkData.map((entry) => ({
+        type: entry.milkType,
+        milkType: entry.milkType,
+        fat: entry.fat,
+        snf: entry.snf,
+        qty: entry.qty,
+        rate: entry.rate,
+        amount: entry.amount,
+      }));
+      setRows(newRows.length > 0 ? newRows : [emptyRow(), emptyRow()]);
+      setBmcRows([emptyRow(), emptyRow()]);
+    } catch (error) {
+      console.error("Error loading milk entries:", error);
+      setSaveError("Failed to load milk entries: " + error.message);
+      setRows([emptyRow(), emptyRow()]);
+      setBmcRows([emptyRow(), emptyRow()]);
+    }
   };
 
   const handleRowChange = useCallback((idx, field, val) => {
@@ -100,7 +157,7 @@ export default function MilkVerification() {
     if (choice === "yes") setBmcRows([emptyRow(), emptyRow()]);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const validRows = rows.filter(isRowValid).map((r) => ({
       type: r.type,
       fat: parseFloat(r.fat),
@@ -158,6 +215,23 @@ export default function MilkVerification() {
       // ignore storage errors
     }
 
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const sessionLabel = new Date().getHours() < 12 ? "M" : "E";
+      await createVerification({
+        societyId: selectedSoc.societyId,
+        bmcId: localStorage.getItem("bmc_id") || bmcUserName,
+        date: today,
+        session: sessionLabel,
+        verifyChoice: verifyChoice === "yes" ? "YES" : "NO",
+        entries: session.entries,
+        bmcEntries,
+        comparisonStatus,
+        savedBy: bmcUserName,
+      });
+    } catch (err) {
+      setSaveError("Failed to save verification: " + err.message);
+    }
     setSocieties((prev) =>
       prev.map((s) => (s.name === selectedSoc.name ? { ...s, status: "verified" } : s)),
     );
@@ -207,11 +281,14 @@ export default function MilkVerification() {
               className="society-dropdown"
               value={selectedSoc?.name || ""}
               onChange={handleSocietyChange}
+              disabled={loadingSocieties}
             >
-              <option value="">- Select Society -</option>
+              <option value="">
+                {loadingSocieties ? "Loading societies..." : societyError ? `Error: ${societyError}` : societies.length === 0 ? "No societies found" : "- Select Society -"}
+              </option>
               {societies.map((s) => (
                 <option key={s.name} value={s.name}>
-                  {s.name} - {s.qty} L
+                  {s.societyId} - {s.name}
                 </option>
               ))}
             </select>
@@ -242,7 +319,13 @@ export default function MilkVerification() {
               </div>
             </div>
 
-            <EntryTable rows={rows} onChange={handleRowChange} onDelete={handleRowDelete} onAddRow={handleAddRow} />
+              <EntryTable
+                rows={rows}
+                onChange={handleRowChange}
+                onDelete={handleRowDelete}
+                onAddRow={handleAddRow}
+                readOnly
+              />
 
             <div className="verify-section">
               <div className="verify-label">Do physical values match society entry?</div>
@@ -301,3 +384,12 @@ export default function MilkVerification() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+

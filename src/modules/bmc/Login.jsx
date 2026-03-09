@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { login } from "../../utils/api";
 
 export default function BMCLogin() {
   const navigate = useNavigate();
@@ -8,10 +9,10 @@ export default function BMCLogin() {
     username: "",
     password: "",
   });
-  const cornerPattern =
+  const dotPattern =
     "data:image/svg+xml;utf8," +
     encodeURIComponent(
-      "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><g stroke='white' stroke-opacity='0.35' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'><path d='M20 40c25 0 25 50 50 50s25-50 50-50 25 50 50 50 25-50 50-50'/><path d='M20 110c25 0 25 50 50 50s25-50 50-50 25 50 50 50 25-50 50-50'/><path d='M60 15c0 25-25 25-25 50s25 25 25 50-25 25-25 50'/></g><g stroke='white' stroke-opacity='0.35' stroke-width='6' fill='none'><circle cx='20' cy='40' r='8'/><circle cx='70' cy='90' r='8'/><circle cx='120' cy='40' r='8'/><circle cx='170' cy='90' r='8'/><circle cx='20' cy='110' r='8'/><circle cx='70' cy='160' r='8'/><circle cx='120' cy='110' r='8'/><circle cx='170' cy='160' r='8'/></g></svg>"
+      "<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'><g fill='rgba(255,255,255,0.6)'><circle cx='10' cy='10' r='2.2'/><circle cx='40' cy='10' r='2.2'/><circle cx='70' cy='10' r='2.2'/><circle cx='100' cy='10' r='2.2'/><circle cx='10' cy='40' r='2.2'/><circle cx='40' cy='40' r='2.2'/><circle cx='70' cy='40' r='2.2'/><circle cx='100' cy='40' r='2.2'/><circle cx='10' cy='70' r='2.2'/><circle cx='40' cy='70' r='2.2'/><circle cx='70' cy='70' r='2.2'/><circle cx='100' cy='70' r='2.2'/><circle cx='10' cy='100' r='2.2'/><circle cx='40' cy='100' r='2.2'/><circle cx='70' cy='100' r='2.2'/><circle cx='100' cy='100' r='2.2'/></g></svg>"
     );
 
   const handleChange = (e) => {
@@ -19,19 +20,33 @@ export default function BMCLogin() {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // TEMP DUMMY AUTH (backend later)
-    const VALID_USERNAME = "BMC_001";
-    const VALID_PASSWORD = "bmc123";
-
-    if (form.username === VALID_USERNAME && form.password === VALID_PASSWORD) {
+    try {
+      const res = await login({ username: form.username, password: form.password });
+      const user = res?.user;
+      
+      if (!user) {
+        alert("Login failed - no user data received");
+        return;
+      }
+      
+      if (user.role !== "BMC") {
+        alert(`Not authorized - This is a ${user.role} account. Please use BMC login credentials.`);
+        return;
+      }
+      localStorage.setItem("auth_token", res.token);
+      localStorage.setItem("user_role", user.role);
+      localStorage.setItem("user_id", user.id);
       localStorage.setItem("bmc_auth", "true");
-      localStorage.setItem("bmc_name", form.username);
+      localStorage.setItem("bmc_name", user.username);
+      localStorage.setItem("bmc_id", user.username);
+      localStorage.removeItem("society_auth");
+      localStorage.removeItem("society_name");
+      localStorage.removeItem("society_id");
       navigate("/bmc/dashboard");
-    } else {
-      alert("Invalid Username or Password");
+    } catch (err) {
+      alert(err.message || "Invalid Username or Password");
     }
   };
 
@@ -44,9 +59,9 @@ export default function BMCLogin() {
           <div
             className="pointer-events-none absolute left-0 top-0 h-64 w-80"
             style={{
-              backgroundImage: `url("${cornerPattern}")`,
-              backgroundSize: "220px 220px",
-              backgroundRepeat: "no-repeat",
+              backgroundImage: `url("${dotPattern}")`,
+              backgroundSize: "40px 40px",
+              backgroundRepeat: "repeat",
               backgroundPosition: "0 0",
             }}
           />
@@ -93,6 +108,7 @@ export default function BMCLogin() {
                 placeholder="Username"
                 value={form.username}
                 onChange={handleChange}
+                autoComplete="username"
                 className="w-full rounded-lg border border-[#d7dbe3] bg-white px-4 py-[11px] text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2e5d7b]"
               />
 
@@ -104,6 +120,7 @@ export default function BMCLogin() {
                   placeholder="Password"
                   value={form.password}
                   onChange={handleChange}
+                  autoComplete="current-password"
                   className="w-full rounded-lg border border-[#d7dbe3] bg-white px-4 py-[11px] pr-11 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2e5d7b]"
                 />
                 <button
@@ -161,9 +178,11 @@ export default function BMCLogin() {
                   <span>Remember Me</span>
                 </label>
 
+                {/*
                 <Link to="/forgot-password" className="hover:text-slate-600">
                   Forgot Password?
                 </Link>
+                */}
               </div>
 
               <button

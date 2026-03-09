@@ -10,28 +10,65 @@
   Pie,
   Cell,
 } from "recharts";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
-import dashboardData from "../../api/dashboard.json";
-import mockDispatchData from "../../api/dispatch";
 import { downloadDispatchPdf } from "../../utils/dispatchPdf";
-
-/* -------------------- DATA -------------------- */
+import { getSocietyDashboard } from "../../utils/api";
 
 const COLORS = ["#1E4B6B", "#9DB5CC"];
-
-/* -------------------- COMPONENT -------------------- */
 
 export default function Dashboard() {
   const username = localStorage.getItem("society_name");
   const avatarLetter = username ? username.charAt(0).toUpperCase() : "";
-  const {
-    summary,
-    milkBreakdown,
-    revenue,
-    feedMineral,
-    updatedOn,
-  } = dashboardData;
+  
+  // State for dashboard data
+  const [summary, setSummary] = useState(null);
+  const [revenue, setRevenue] = useState([]);
+  const [feedMineral, setFeedMineral] = useState([]);
+  const [milkBreakdown, setMilkBreakdown] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const updatedOn = new Date().toLocaleDateString() || "";
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDashboardData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const societyId = localStorage.getItem("society_id") || localStorage.getItem("society_name") || "";
+        const response = await getSocietyDashboard({ societyId });
+        const data = response?.data || {};
+
+        if (!active) return;
+        setSummary(
+          data.summary || {
+            totalMilk: 0,
+            totalFarmers: 0,
+            session: { morning: 0, evening: 0 },
+            type: { cow: 0, buffalo: 0 },
+          }
+        );
+        setMilkBreakdown(data.milkBreakdown || []);
+        setRevenue(data.revenue || []);
+        setFeedMineral(data.feedMineral || []);
+
+        setLoading(false);
+      } catch (err) {
+        if (!active) return;
+        console.error("Error loading dashboard data:", err);
+        setError(err.message);
+        setLoading(false);
+      }
+    }
+
+    loadDashboardData();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     document.body.classList.add("dashboard-no-scroll");
@@ -39,6 +76,45 @@ export default function Dashboard() {
       document.body.classList.remove("dashboard-no-scroll");
     };
   }, []);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E4B6B]"></div>
+          <p className="mt-4 text-[#5B6B7F]">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-lg mb-4">?? Error Loading Dashboard</div>
+          <p className="text-[#5B6B7F] mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-[#1E4B6B] text-white rounded-lg hover:bg-[#162d47]"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback for missing summary data
+  if (!summary) {
+    return (
+      <div className="bg-[linear-gradient(180deg,#F7FAFF_0%,#EEF4FF_100%)] min-h-screen p-6 flex items-center justify-center">
+        <p className="text-[#5B6B7F]">No data available</p>
+      </div>
+    );
+  }
 
   const handleDownloadDashboard = () => {
     const pdf = new jsPDF("portrait", "mm", "a4");
@@ -156,7 +232,8 @@ export default function Dashboard() {
   };
 
   const handleDownloadDispatchSheet = () => {
-    downloadDispatchPdf(mockDispatchData);
+    // Dispatch sheet functionality - add API call when needed
+    console.log("Download dispatch sheet");
   };
 
   return (
@@ -514,6 +591,12 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+
+
+
+
 
 
 

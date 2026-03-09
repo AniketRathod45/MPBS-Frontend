@@ -1,7 +1,6 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-import mockDispatchData from "../../api/dispatch";
 
 export default function DispatchSheet() {
   const navigate = useNavigate();
@@ -10,8 +9,9 @@ export default function DispatchSheet() {
 
   const handleGenerate = () => {
     setLoading(true);
+    // For now, show a message that dispatch generation needs to be implemented
     setTimeout(() => {
-      setDispatchData(mockDispatchData);
+      alert("Dispatch generation is not implemented yet");
       setLoading(false);
     }, 300);
   };
@@ -194,6 +194,8 @@ export default function DispatchSheet() {
     </div>
   );
 }
+
+
 
 
 

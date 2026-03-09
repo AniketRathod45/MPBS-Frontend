@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { sendNotification } from "../../api/admin";
+﻿import { useState } from "react";
+import { createNotification, uploadNotificationFile } from "../../utils/api";
 
 const RECIPIENT_OPTIONS = ["Society", "EO", "Dairy", "BMC", "All"];
 
@@ -22,27 +22,23 @@ export default function Notifications() {
     }
 
     setLoading(true);
-
-    const attachment = file ? {
-      name: file.name,
-      url: URL.createObjectURL(file) // Mock URL
-    } : null;
-
-    const res = await sendNotification({
-      sentTo,
-      message,
-      attachment
-    });
-
-    setLoading(false);
-
-    if (res.success) {
+    try {
+      let fileUrl;
+      if (file) {
+        const upload = await uploadNotificationFile(file);
+        fileUrl = upload.url;
+      }
+      await createNotification({
+        sentToRole: sentTo,
+        message,
+        fileUrl,
+      });
       alert("Notification sent successfully");
       setSentTo("");
       setMessage("");
       setFile(null);
-    } else {
-      alert(res.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -63,8 +59,10 @@ export default function Notifications() {
               required
             >
               <option value="">Select Recipient</option>
-              {RECIPIENT_OPTIONS.map(opt => (
-                <option key={opt} value={opt}>{opt}</option>
+              {RECIPIENT_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
               ))}
             </select>
           </div>
