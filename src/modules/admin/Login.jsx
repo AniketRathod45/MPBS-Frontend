@@ -52,7 +52,7 @@ export default function AdminLogin() {
       localStorage.removeItem("bmc_auth");
       localStorage.removeItem("bmc_name");
       localStorage.removeItem("bmc_id");
-      navigate("/admin/users");
+      navigate("/admin/dashboard");
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
