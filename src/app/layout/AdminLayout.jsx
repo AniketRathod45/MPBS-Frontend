@@ -9,12 +9,21 @@ export default function AdminLayout() {
   };
 
   const navItems = [
+    { label: "Dashboard", to: "/admin/dashboard", icon: "dashboard" },
     { label: "User Management", to: "/admin/users", icon: "users" },
     { label: "Requests", to: "/admin/requests", icon: "requests" },
     { label: "Notifications", to: "/admin/notifications", icon: "notifications" },
   ];
 
   const iconMap = {
+    dashboard: (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M3 13h8v8H3v-8Zm10-10h8v6h-8V3ZM13 11h8v10h-8V11ZM3 3h8v8H3V3Z"
+        />
+      </svg>
+    ),
     users: (
       <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
         <path

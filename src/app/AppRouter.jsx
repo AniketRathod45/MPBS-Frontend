@@ -12,6 +12,7 @@ import AuthGuard from "../shared/components/AuthGaurd";
 
 // ================= ADMIN =================
 import AdminLogin from "../modules/admin/Login";
+import AdminDashboard from "../modules/admin/Dashboard";
 import UserManagement from "../modules/admin/UserManagement";
 import Requests from "../modules/admin/Requests";
 import Notifications from "../modules/admin/Notifications";
@@ -68,7 +69,8 @@ export default function AppRouter() {
             </AdminAuthGuard>
           }
         >
-          <Route index element={<Navigate to="/admin/users" replace />} />
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="requests" element={<Requests />} />
           <Route path="notifications" element={<Notifications />} />
