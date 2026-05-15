@@ -35,4 +35,8 @@
     "tailwindcss": "^4.2.1",
     "vite": "^7.2.4"
   }
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pramodgg238/MPBS-Frontend3.git"
+  },
 }

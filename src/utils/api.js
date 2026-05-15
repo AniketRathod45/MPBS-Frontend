@@ -16,6 +16,18 @@ function getToken() {
     return localStorage.getItem("bmc_token") || localStorage.getItem("auth_token") || "";
   }
 
+  if (pathname.startsWith("/dairy")) {
+    return localStorage.getItem("dairy_token") || localStorage.getItem("auth_token") || "";
+  }
+
+  if (pathname.startsWith("/account")) {
+    return localStorage.getItem("account_token") || localStorage.getItem("auth_token") || "";
+  }
+
+  if (pathname.startsWith("/audit")) {
+    return localStorage.getItem("audit_token") || localStorage.getItem("auth_token") || "";
+  }
+
   return localStorage.getItem("society_token") || localStorage.getItem("auth_token") || "";
 }
 
@@ -89,6 +101,26 @@ async function request(path, options = {}) {
       
       throw error;
     }
+  }
+}
+
+async function requestNoAuth(path, options = {}) {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+      ...options,
+    });
+
+    const payload = await readJsonSafely(res);
+    if (!res.ok) throw new Error(payload?.message || `Request failed (${res.status})`);
+    return payload;
+  } catch (error) {
+    const isNetworkError = error?.message?.includes('fetch') || error?.name === 'TypeError';
+    if (isNetworkError) throw new Error(backendUnavailableMessage());
+    throw error;
   }
 }
 
@@ -168,6 +200,38 @@ export function getDairyDashboard(params = {}) {
   if (params.session) search.set("session", params.session);
   const qs = search.toString();
   return request(`/dashboards/dairy${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchAuditReport(role, params = {}) {
+  const search = new URLSearchParams();
+  if (params.societyId) search.set("societyId", params.societyId);
+  if (params.bmcId) search.set("bmcId", params.bmcId);
+  if (params.cycleId) search.set("cycleId", params.cycleId);
+  if (params.date) search.set("date", params.date);
+  if (params.from) search.set("from", params.from);
+  if (params.to) search.set("to", params.to);
+  const qs = search.toString();
+  const path = `/audit/reports/${encodeURIComponent(role)}${qs ? `?${qs}` : ""}`;
+
+  try {
+    return request(path);
+  } catch (err) {
+    const msg = String(err?.message || "").toLowerCase();
+    if (msg.includes("missing token") || msg.includes("invalid token") || msg.includes("unauthorized") || msg.includes("forbidden") || msg.includes("401") || msg.includes("403")) {
+      // Try public debug endpoint (no auth) as a fallback for local/dev convenience
+      try {
+        return requestNoAuth(`/audit/reports/public/${encodeURIComponent(role)}${qs ? `?${qs}` : ""}`);
+      } catch (err2) {
+        throw err2;
+      }
+    }
+
+    throw err;
+  }
+}
+
+export function listAuditReportTypes() {
+  return request("/audit/reports");
 }
 
 export function login(body) {

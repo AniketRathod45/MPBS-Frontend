@@ -14,6 +14,7 @@ import dashboardRoutes from "./routes/dashboards.js";
 import notificationRoutes from "./routes/notifications.js";
 import requestRoutes from "./routes/requests.js";
 import reportRoutes from "./routes/reports.js";
+import auditReportRoutes from "./routes/auditReports.js";
 import uploadRoutes from "./routes/uploads.js";
 import accountsRoutes from "./routes/accounts.js";
 import claimsRoutes from "./routes/claims.js";
@@ -155,6 +156,7 @@ export function createApp(options = {}) {
   app.use("/notifications", notificationRoutes);
   app.use("/requests", requestRoutes);
   app.use("/reports", reportRoutes);
+  app.use("/audit/reports", auditReportRoutes);
   app.use("/uploads", uploadRoutes);
   app.use("/claims", claimsRoutes);
   app.use("/recoverables", recoverablesRoutes);
