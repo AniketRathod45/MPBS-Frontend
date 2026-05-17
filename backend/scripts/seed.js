@@ -35,6 +35,9 @@ async function run() {
   const bmcPass = await bcrypt.hash("bmc123", 10);
   await User.create({ username: "BMC_001", passwordHash: bmcPass, role: "BMC", authStatus: "Approved" });
 
+  const dairyPass = await bcrypt.hash("dairy123", 10);
+  await User.create({ username: "DAIRY_001", passwordHash: dairyPass, role: "Dairy", authStatus: "Approved" });
+
   const auditPass = await bcrypt.hash("audit123", 10);
   await User.create({ username: "audit", passwordHash: auditPass, role: "Audit", authStatus: "Approved" });
   const accountPass = await bcrypt.hash("123", 10);

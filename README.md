@@ -93,6 +93,10 @@ SOCIETY_FIXED_RATE=45
 - Username: `BMC_001`
 - Password: `bmc123`
 
+### Dairy User
+- Username: `DAIRY_001`
+- Password: `dairy123`
+
 ### Admin User
 - Username: `admin`
 - Password: `admin123`

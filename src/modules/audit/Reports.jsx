@@ -1,26 +1,18 @@
 import React, { useState, useEffect } from "react";
+import { fetchAuditReport, fetchBillingCycles, fetchSocieties } from "../../utils/api";
 
 // Entity lists for each role
-const SOCIETIES = [
-  { id: "s1", name: "SOCIETY_001", label: "SOCIETY_001" },
-  { id: "s2", name: "SOCIETY_002", label: "SOCIETY_002" },
-  { id: "s3", name: "SOCIETY_003", label: "SOCIETY_003" },
-];
-
-const BMCS = [
-  { id: "b1", name: "BMC_001", label: "BMC_001" },
-  { id: "b2", name: "BMC_002", label: "BMC_002" },
-  { id: "b3", name: "BMC_003", label: "BMC_003" },
-];
-
+const DEFAULT_SOCIETIES = [];
 const ADMINS = [
-  { id: "a1", name: "admin001", label: "Admin - Super Admin" },
-  { id: "a2", name: "admin002", label: "Admin - Regional" },
+  { id: "admin001", name: "admin001", label: "admin001" },
+];
+
+const ACCOUNTS = [
+  { id: "account001", name: "account001", label: "account001" },
 ];
 
 const DIARIES = [
-  { id: "d1", name: "Dairy Main", label: "Main Dairy" },
-  { id: "d2", name: "Dairy Branch", label: "Branch Dairy" },
+  { id: "DAIRY_001", name: "DAIRY_001", label: "DAIRY_001" },
 ];
 
 const MOCK_DATA = [
@@ -112,29 +104,25 @@ const BMC_MOCK_DATA = {
 
 // ADMIN Mock Data
 const ADMIN_MOCK_DATA = {
-  "Admin - Super Admin": {
+  "admin001": {
     dcsCount: 884,
     bmcCount: 70,
     dairyUnitsCount: 3,
-    cowMilk: 81.48,
-    buffaloMilk: 18.51,
-    billedPercent: 92,
-    unbilledPercent: 8,
-  },
-  "Admin - Regional": {
-    dcsCount: 412,
-    bmcCount: 35,
-    dairyUnitsCount: 1,
-    cowMilk: 80.5,
-    buffaloMilk: 19.5,
-    billedPercent: 89,
-    unbilledPercent: 11,
+    eosCount: 27,
+    societiesCount: 120,
+    farmersCount: 2450,
+    totalMilkCollected: 458000,
   },
 };
 
 // DIARY Mock Data - for each dairy
 const DIARY_MOCK_DATA = {
-  "Main Dairy": {
+  "DAIRY_001": {
+    milkReceived: 18450,
+    tankerCount: 28,
+    pendingVerification: 6,
+    totalShortage: 420,
+    penaltyDeduction: 14700,
     totalEntries: 156,
     completedRecords: 148,
     pendingRecords: 8,
@@ -145,27 +133,94 @@ const DIARY_MOCK_DATA = {
     errorRecords: 3,
     verifiedBy: "Admin - Super Admin",
   },
-  "Branch Dairy": {
-    totalEntries: 98,
-    completedRecords: 92,
-    pendingRecords: 6,
-    transactions: 184,
-    completionRate: 93.87,
-    lastUpdated: "13:15:00",
-    avgTime: 4.8,
-    errorRecords: 2,
-    verifiedBy: "Admin - Regional",
-  },
 };
 
 export default function AuditReports() {
   const [roleFilter, setRoleFilter] = useState("Society");
-  const [selectedEntity, setSelectedEntity] = useState("s1"); // Default to first society
+  const [societies, setSocieties] = useState(DEFAULT_SOCIETIES);
+  const [bmcEntities, setBmcEntities] = useState([]);
+  const [accountCycles, setAccountCycles] = useState([]);
+  const [selectedEntity, setSelectedEntity] = useState("");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]); // Today's date
   const [summary, setSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState("");
   const [searchTriggered, setSearchTriggered] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSocieties() {
+      try {
+        const response = await fetchSocieties();
+        if (cancelled) return;
+
+        const list = Array.isArray(response?.data) ? response.data : [];
+        const nextSocieties = list.map((society) => ({
+          id: society.societyId,
+          name: society.societyName || society.societyId,
+          label: society.societyName || society.societyId,
+        }));
+
+        const nextBmcEntities = Array.from(
+          new Map(
+            list
+              .filter((society) => society.bmcId)
+              .map((society) => [society.bmcId, {
+                id: society.bmcId,
+                name: society.bmcId,
+                label: society.bmcId,
+              }])
+          ).values()
+        ).sort((left, right) => left.label.localeCompare(right.label));
+
+        setSocieties(nextSocieties);
+        setBmcEntities(nextBmcEntities);
+        if (!selectedEntity && nextSocieties.length > 0) {
+          setSelectedEntity(nextSocieties[0].id);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSummaryError(error?.message || "Failed to load societies.");
+        }
+      }
+    }
+
+    async function loadAccountCycles() {
+      try {
+        const response = await fetchBillingCycles();
+        if (cancelled) return;
+
+        const list = Array.isArray(response?.data) ? response.data : [];
+        const nextCycles = list
+          .map((cycle) => ({
+            id: cycle.id || cycle.code,
+            name: cycle.label || cycle.code || cycle.id,
+            label: cycle.label || cycle.code || cycle.id,
+          }))
+          .filter((cycle) => cycle.id)
+          .sort((left, right) => left.label.localeCompare(right.label));
+
+        setAccountCycles(nextCycles);
+      } catch (error) {
+        if (!cancelled) {
+          setSummaryError(error?.message || "Failed to load billing cycles.");
+        }
+      }
+    }
+
+    if (roleFilter === "Society") {
+      loadSocieties();
+    }
+
+    if (roleFilter === "Account") {
+      loadAccountCycles();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roleFilter]);
 
   const handleSearch = async () => {
     setSearchTriggered(true);
@@ -174,26 +229,114 @@ export default function AuditReports() {
     setLoadingSummary(true);
 
     try {
+      const params = { date: selectedDate };
+
       if (roleFilter === "Society") {
-        const society = SOCIETIES.find(s => s.id === selectedEntity);
+        const society = societies.find((s) => s.id === selectedEntity);
         if (!society) throw new Error("No society selected");
-        const mockData = SOCIETY_MOCK_DATA[society.label];
-        setSummary({ role: "Society", label: society.label, date: selectedDate, data: mockData });
+        params.societyId = society.id;
       } else if (roleFilter === "BMC") {
-        const bmc = BMCS.find(b => b.id === selectedEntity);
+        const bmc = bmcEntities.find((b) => b.id === selectedEntity);
         if (!bmc) throw new Error("No BMC selected");
-        const mockData = BMC_MOCK_DATA[bmc.label];
-        setSummary({ role: "BMC", label: bmc.label, date: selectedDate, data: mockData });
+        params.bmcId = bmc.id;
+      } else if (roleFilter === "Account") {
+        // Support a local placeholder `account001` by mapping it to the latest
+        // available billing cycle when present. If no cycles exist, let the
+        // backend pick its default.
+        if (selectedEntity === "account001") {
+          if (Array.isArray(accountCycles) && accountCycles.length > 0) {
+            params.cycleId = accountCycles[0].id;
+          }
+        } else if (accountCycles.some((cycle) => cycle.id === selectedEntity)) {
+          params.cycleId = selectedEntity;
+        }
+      }
+
+      const response = await fetchAuditReport(roleFilter, params);
+      const backendData = response?.data || {};
+      const cards = Array.isArray(backendData.cards) ? backendData.cards : [];
+      const cardMap = new Map(cards.map((card) => [card.label, card.value]));
+      const readNumber = (label) => Number(String(cardMap.get(label) || "0").replace(/[^0-9.-]/g, "")) || 0;
+      const label = backendData.label || selectedEntity || roleFilter;
+
+      if (roleFilter === "Society") {
+        setSummary({
+          role: "Society",
+          label,
+          date: selectedDate,
+          data: {
+            summary: {
+              totalMilk: readNumber("Total Milk Collected"),
+              totalFarmers: readNumber("Total Farmers"),
+              verified: readNumber("Verification Status"),
+              type: {
+                cow: readNumber("Cow Milk"),
+                buffalo: readNumber("Buffalo Milk"),
+              },
+              session: {
+                morning: readNumber("Morning Collection"),
+                evening: readNumber("Evening Collection"),
+              },
+              points: 0,
+              rejected: 0,
+              milkAmount: readNumber("Milk Amount"),
+            },
+          },
+        });
+      } else if (roleFilter === "BMC") {
+        setSummary({
+          role: "BMC",
+          label,
+          date: selectedDate,
+          data: {
+            summary: {
+              totalMilk: readNumber("Total Milk Received"),
+              totalVerified: readNumber("Total Verified"),
+              acceptanceRate: readNumber("Acceptance Rate"),
+              type: {
+                cow: readNumber("Cow Milk Received"),
+                buffalo: readNumber("Buffalo Milk Received"),
+              },
+            },
+            dispatchStats: { totalDispatches: readNumber("Total Dispatches") },
+          },
+        });
       } else if (roleFilter === "Admin") {
-        const admin = ADMINS.find(a => a.id === selectedEntity);
-        if (!admin) throw new Error("No admin selected");
-        const mockData = ADMIN_MOCK_DATA[admin.label];
-        setSummary({ role: "Admin", label: admin.label, date: selectedDate, data: mockData });
+        setSummary({
+          role: "Admin",
+          label,
+          date: selectedDate,
+          data: {
+            dcsCount: readNumber("No. of DCS"),
+            bmcCount: readNumber("No. of BMC"),
+            dairyUnitsCount: readNumber("No. of Dairy Units"),
+            eosCount: readNumber("No. of EO"),
+          },
+        });
       } else if (roleFilter === "Diary") {
-        const diary = DIARIES.find(d => d.id === selectedEntity);
-        if (!diary) throw new Error("No diary selected");
-        const mockData = DIARY_MOCK_DATA[diary.label];
-        setSummary({ role: "Diary", label: diary.label, date: selectedDate, data: mockData });
+        setSummary({
+          role: "Diary",
+          label,
+          date: selectedDate,
+          data: {
+            milkReceived: readNumber("Milk Received Today"),
+            tankerCount: readNumber("Tankers Received"),
+            pendingVerification: readNumber("Pending Verification"),
+            totalShortage: readNumber("Total Shortage Today"),
+            penaltyDeduction: readNumber("Penalty Deduction"),
+          },
+        });
+      } else if (roleFilter === "Account") {
+        const accountCards = cards.filter((card) => card.label !== "Invoices");
+        setSummary({
+          role: "Account",
+          label,
+          date: selectedDate,
+          data: {
+            cards: accountCards,
+            invoiceCount: readNumber("Invoices"),
+          },
+        });
       }
     } catch (err) {
       setSummaryError(err.message || String(err));
@@ -206,11 +349,14 @@ export default function AuditReports() {
   const getEntityList = () => {
     switch (roleFilter) {
       case "Society":
-        return SOCIETIES;
+        return societies;
       case "BMC":
-        return BMCS;
+        return bmcEntities;
       case "Admin":
         return ADMINS;
+      case "Account":
+        // Always show a local account placeholder first, then available billing cycles
+        return [...ACCOUNTS, ...accountCycles];
       case "Diary":
         return DIARIES;
       default:
@@ -221,10 +367,15 @@ export default function AuditReports() {
   // Update selected entity when role changes
   useEffect(() => {
     const entities = getEntityList();
-    if (entities.length > 0) {
+    if (entities.length === 0) {
+      return;
+    }
+
+    const hasCurrentSelection = entities.some((entity) => entity.id === selectedEntity);
+    if (!hasCurrentSelection) {
       setSelectedEntity(entities[0].id);
     }
-  }, [roleFilter]);
+  }, [roleFilter, societies, bmcEntities, accountCycles, selectedEntity]);
 
   return (
     <div className="p-6 bg-blue-50 min-h-screen">
@@ -243,6 +394,7 @@ export default function AuditReports() {
             <option value="Society">Society</option>
             <option value="BMC">BMC</option>
             <option value="Admin">Admin</option>
+            <option value="Account">Account</option>
             <option value="Diary">Diary</option>
           </select>
         </div>
@@ -293,7 +445,7 @@ export default function AuditReports() {
               {summary.role === "Society" && (
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800 mb-4">Society Audit Report - {summary.label}</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
                     <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                       <p className="text-xs text-slate-500 font-medium mb-2">ENTITY</p>
                       <p className="font-semibold text-slate-800">{summary.label}</p>
@@ -336,6 +488,29 @@ export default function AuditReports() {
                       <p className="text-xs text-slate-500 font-medium mb-2">EVENING COLLECTION</p>
                       <p className="font-semibold text-lg text-slate-800">{summary.data?.summary?.session?.evening ?? "0"} L</p>
                       <p className="text-xs text-slate-600 mt-2">Session</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                      <p className="text-xs text-slate-500 font-medium mb-2">COW MILK AMOUNT</p>
+                      <p className="font-semibold text-lg text-slate-800">₹{summary.data?.summary?.type?.cow ?? "0"}</p>
+                      <p className="text-xs text-slate-600 mt-2">Cow Amount</p>
+                    </div>
+                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                      <p className="text-xs text-slate-500 font-medium mb-2">BUFFALO MILK AMOUNT</p>
+                      <p className="font-semibold text-lg text-slate-800">₹{summary.data?.summary?.type?.buffalo ?? "0"}</p>
+                      <p className="text-xs text-slate-600 mt-2">Buffalo Amount</p>
+                    </div>
+                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                      <p className="text-xs text-slate-500 font-medium mb-2">MORNING AMOUNT</p>
+                      <p className="font-semibold text-lg text-slate-800">₹{summary.data?.summary?.session?.morning ?? "0"}</p>
+                      <p className="text-xs text-slate-600 mt-2">Morning Amount</p>
+                    </div>
+                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                      <p className="text-xs text-slate-500 font-medium mb-2">EVENING AMOUNT</p>
+                      <p className="font-semibold text-lg text-slate-800">₹{summary.data?.summary?.session?.evening ?? "0"}</p>
+                      <p className="text-xs text-slate-600 mt-2">Evening Amount</p>
                     </div>
                   </div>
                 </div>
@@ -388,6 +563,30 @@ export default function AuditReports() {
                 </div>
               )}
 
+              {/* ACCOUNT AUDIT DATA */}
+              {summary.role === "Account" && (
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-4">Account Audit Report - {summary.label}</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    {(summary.data?.cards || []).map((card) => (
+                      <div
+                        key={card.label}
+                        className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                      >
+                        <p className="text-xs text-slate-500 font-medium mb-2">{card.label.toUpperCase()}</p>
+                        <p className="font-semibold text-lg text-slate-800">{card.value}</p>
+                        {card.sub ? <p className="text-xs text-slate-600 mt-2">{card.sub}</p> : null}
+                      </div>
+                    ))}
+                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                      <p className="text-xs text-slate-500 font-medium mb-2">INVOICES</p>
+                      <p className="font-semibold text-lg text-slate-800">{summary.data?.invoiceCount ?? 0}</p>
+                      <p className="text-xs text-slate-600 mt-2">Sent</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ADMIN AUDIT DATA */}
               {summary.role === "Admin" && (
                 <div>
@@ -413,28 +612,10 @@ export default function AuditReports() {
                       <p className="font-semibold text-lg text-slate-800">{summary.data?.dairyUnitsCount ?? "0"}</p>
                       <p className="text-xs text-slate-600 mt-2">Active</p>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">COW MILK PROCURED</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.cowMilk ?? "0"}%</p>
-                      <p className="text-xs text-slate-600 mt-2">% of Total</p>
-                    </div>
-                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">BUFFALO MILK PROCURED</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.buffaloMilk ?? "0"}%</p>
-                      <p className="text-xs text-slate-600 mt-2">% of Total</p>
-                    </div>
-                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">BILLED AMOUNT</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.billedPercent ?? "0"}%</p>
-                      <p className="text-xs text-slate-600 mt-2">Finance Status</p>
-                    </div>
-                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">UNBILLED AMOUNT</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.unbilledPercent ?? "0"}%</p>
-                      <p className="text-xs text-slate-600 mt-2">Finance Status</p>
+                      <p className="text-xs text-slate-500 font-medium mb-2">NO. OF EO</p>
+                      <p className="font-semibold text-lg text-slate-800">{summary.data?.eosCount ?? "0"}</p>
+                      <p className="text-xs text-slate-600 mt-2">EO</p>
                     </div>
                   </div>
                 </div>
@@ -446,60 +627,32 @@ export default function AuditReports() {
                   <h2 className="text-2xl font-bold text-gray-800 mb-4">Diary Audit Report - {summary.label}</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                     <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">ENTITY</p>
-                      <p className="font-semibold text-slate-800">{summary.label}</p>
-                      <p className="text-xs text-slate-600 mt-2">Date: {summary.date}</p>
+                      <p className="text-xs text-slate-500 font-medium mb-2">MILK RECEIVED TODAY</p>
+                      <p className="font-semibold text-lg text-slate-800">{summary.data?.milkReceived ?? "0"} L</p>
+                      <p className="text-xs text-slate-600 mt-2">Current Shift</p>
                     </div>
                     <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">TOTAL ENTRIES</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.totalEntries ?? "0"}</p>
-                      <p className="text-xs text-slate-600 mt-2">Records</p>
-                    </div>
-                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">COMPLETED RECORDS</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.completedRecords ?? "0"}</p>
-                      <p className="text-xs text-slate-600 mt-2">Status</p>
-                    </div>
-                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">PENDING RECORDS</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.pendingRecords ?? "0"}</p>
-                      <p className="text-xs text-slate-600 mt-2">In Process</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">TOTAL TRANSACTIONS</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.transactions ?? "0"}</p>
-                      <p className="text-xs text-slate-600 mt-2">Processed</p>
-                    </div>
-                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">COMPLETION RATE</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.completionRate ?? "0"}%</p>
+                      <p className="text-xs text-slate-500 font-medium mb-2">TANKERS RECEIVED</p>
+                      <p className="font-semibold text-lg text-slate-800">{summary.data?.tankerCount ?? "0"}</p>
                       <p className="text-xs text-slate-600 mt-2">Today</p>
                     </div>
                     <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">LAST UPDATED</p>
-                      <p className="font-semibold text-sm text-slate-800">{summary.data?.lastUpdated ?? "—"}</p>
-                      <p className="text-xs text-slate-600 mt-2">Time</p>
+                      <p className="text-xs text-slate-500 font-medium mb-2">PENDING VERIFICATION</p>
+                      <p className="font-semibold text-lg text-slate-800">{summary.data?.pendingVerification ?? "0"}</p>
+                      <p className="text-xs text-slate-600 mt-2">Tankers</p>
                     </div>
                     <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">AVERAGE TIME/ENTRY</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.avgTime ?? "0"} min</p>
-                      <p className="text-xs text-slate-600 mt-2">Minutes</p>
+                      <p className="text-xs text-slate-500 font-medium mb-2">TOTAL SHORTAGE TODAY</p>
+                      <p className="font-semibold text-lg text-slate-800">{summary.data?.totalShortage ?? "0"} L</p>
+                      <p className="text-xs text-slate-600 mt-2">Shortage</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">ERROR RECORDS</p>
-                      <p className="font-semibold text-lg text-slate-800">{summary.data?.errorRecords ?? "0"}</p>
-                      <p className="text-xs text-slate-600 mt-2">Needs Review</p>
-                    </div>
-                    <div className="bg-white rounded px-4 py-3 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-xs text-slate-500 font-medium mb-2">VERIFIED BY</p>
-                      <p className="font-semibold text-sm text-slate-800">{summary.data?.verifiedBy ?? "—"}</p>
-                      <p className="text-xs text-slate-600 mt-2">Authority</p>
+                      <p className="text-xs text-slate-500 font-medium mb-2">PENALTY DEDUCTION</p>
+                      <p className="font-semibold text-lg text-slate-800">Rs. {summary.data?.penaltyDeduction ?? "0"}</p>
+                      <p className="text-xs text-slate-600 mt-2">From Milk Receipt</p>
                     </div>
                   </div>
                 </div>
